@@ -1,0 +1,28 @@
+name: JIRA scheduled checker
+
+on:
+  schedule:
+    - cron: '0 1,9 * * 1-5'   # Runs every 09:00 and 17:00 HKT
+  workflow_dispatch:        # Manual trigger
+
+jobs:
+  run-check-jira-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run check JIRA script
+        env:
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          JIRA_DOMAIN: ${{ vars.JIRA_DOMAIN }}
+          JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY }}
+        run: python script/check_jira.py
