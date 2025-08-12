@@ -23,6 +23,6 @@ jobs:
       - name: Run check JIRA script
         env:
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
-          JIRA_DOMAIN: ${{ vars.JIRA_DOMAIN }}
+          JIRA_DOMAIN: ${{ secrets.JIRA_DOMAIN }}
           JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY }}
         run: python script/check_jira.py
