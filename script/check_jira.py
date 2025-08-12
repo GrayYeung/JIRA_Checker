@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 
-from script.helper.jira_client import JiraClient, SearchTicketsParams, SearchTicketsResponse, TransitionsResponse, \
+from helper.jira_client import JiraClient, SearchTicketsParams, SearchTicketsResponse, TransitionsResponse, \
     Transition, RemoteLink, Issue
 
 ## JIRA config
