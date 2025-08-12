@@ -5,11 +5,14 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 
+from script.helper.jira_client import JiraClient, SearchTicketsParams, SearchTicketsResponse, TransitionsResponse, \
+    Transition, RemoteLink, Issue
+
 ## JIRA config
 JIRA_TOKEN = os.getenv('JIRA_TOKEN')
 JIRA_DOMAIN = os.getenv('JIRA_DOMAIN')
 JIRA_PROJECT_KEY = os.getenv('JIRA_PROJECT_KEY')
-
+jira_client = JiraClient(JIRA_DOMAIN, JIRA_TOKEN)
 
 ## Log config
 logging.basicConfig(
@@ -36,9 +39,9 @@ def check_for_deployment_note() -> None:
         logging.info(f"[{ticket_id}] Processing ticket...")
 
         try:
-            remote_links = fetch_remote_link(ticket_id)
+            remote_links_response: list[RemoteLink] = jira_client.fetch_remote_link(ticket_id)
 
-            if not is_valid(remote_links, ticket_id):
+            if not is_valid(remote_links_response, ticket_id):
                 do_transition(ticket_id)
                 add_comment(ticket_id)
                 bad_tickets.append(ticket_id)
@@ -62,29 +65,25 @@ def fetch_tickets() -> list[str]:
     :return: List of ticket Ids
     """
 
-    url = f"https://{JIRA_DOMAIN}/rest/api/3/search"
-
     # get the last week updated tickets with DeploymentNote label
     status_list = ['"DONE (Development)"', 'Accepted']
     time_range = "5d"  # e.g.: h,d,w
     project = JIRA_PROJECT_KEY
 
     jql = f'updated >= -{time_range} and labels IN (DeploymentNote) and status IN ({", ".join(status_list)}) and project = {project}'
-    fields = "assignee,status"
+    fields = ["assignee", "status"]
 
-    params = {
-        "jql": jql,
-        "fields": fields,
-        "maxResults": 200,
-    }
+    params = SearchTicketsParams(
+        jql=jql,
+        fields=fields,
+    )
 
     logging.info("Fetching tickets with JQL: '%s'...", jql)
-    response = requests.get(url, headers=__create_header(), params=params)
-    response.raise_for_status()
+    response: SearchTicketsResponse = jira_client.fetch_search(params)
 
     return [
-        issue["key"]
-        for issue in response.json().get("issues", [])
+        issue.key
+        for issue in response.issues
     ]
 
 
@@ -100,16 +99,7 @@ def __create_header() -> dict[str, str]:
     }
 
 
-def fetch_remote_link(ticket_id: str) -> list[dict]:
-    url = f"https://{JIRA_DOMAIN}/rest/api/3/issue/{ticket_id}/remotelink"
-
-    response = requests.get(url, headers=__create_header())
-    response.raise_for_status()
-
-    return response.json()
-
-
-def is_valid(remote_link_resp: list[dict], key: str) -> bool:
+def is_valid(remote_link_resp: list[RemoteLink], key: str) -> bool:
     """
     Validate by:
     1. Extract each remote link by `relationship` field
@@ -125,8 +115,8 @@ def is_valid(remote_link_resp: list[dict], key: str) -> bool:
         return False
 
     for remote_link in remote_link_resp:
-        if remote_link.get("relationship") == "mentioned in":
-            url = remote_link.get("object", {}).get("url")
+        if remote_link.relationship == "mentioned in":
+            url = remote_link.object.url
             if not url:
                 continue
 
@@ -134,11 +124,11 @@ def is_valid(remote_link_resp: list[dict], key: str) -> bool:
             if not page_id:
                 continue
 
-            content = fetch_confluence_content(page_id)
+            content = jira_client.fetch_confluence_content(page_id)
             if not content:
                 continue
 
-            title = content["title"]
+            title = content.title
             if "release" in title.lower():
                 logging.info(f"[{key}] Found valid remote link for page_id: {page_id} ✅")
                 return True
@@ -155,25 +145,14 @@ def extract_page_id(url: str) -> str | None:
     return None
 
 
-def fetch_confluence_content(page_id: str) -> dict | None:
-    url = f"https://{JIRA_DOMAIN}/wiki/api/v2/pages/{page_id}"
-
-    try:
-        response = requests.get(url, headers=__create_header())
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error fetching Confluence content for page {page_id}: {e}")
-        return None
-
-
 def do_transition(ticket_id: str) -> None:
     """
     Perform the transition to "Rework" state for a given ticket.
     :param ticket_id:
     """
 
-    available_transitions = fetch_transitions(ticket_id)
+    response: TransitionsResponse = jira_client.fetch_transitions(ticket_id)
+    available_transitions = response.transitions
 
     target_state = "Rework"
     target_state_id = find_target_state_id(available_transitions, target_state)
@@ -183,37 +162,15 @@ def do_transition(ticket_id: str) -> None:
         return
 
     ## Perform the transition
-
-    url = f"https://{JIRA_DOMAIN}/rest/api/3/issue/{ticket_id}/transitions"
-
-    payload = {
-        "transition": {
-            "id": target_state_id
-        }
-    }
-
-    response = requests.post(url, headers=__create_header(), json=payload)
-    response.raise_for_status()
-
+    jira_client.do_transition(ticket_id, target_state_id)
     logging.info(f"[{ticket_id}] Transited to '{target_state}'")
     return
 
 
-def fetch_transitions(ticket_id: str) -> list[dict]:
-    """Fetch available transitions for a ticket."""
-
-    url = f"https://{JIRA_DOMAIN}/rest/api/3/issue/{ticket_id}/transitions"
-
-    response = requests.get(url, headers=__create_header())
-    response.raise_for_status()
-
-    return response.json().get("transitions", [])
-
-
-def find_target_state_id(transitions: list[dict], target_state: str) -> str | None:
+def find_target_state_id(transitions: list[Transition], target_state: str) -> str | None:
     for transition in transitions:
-        if transition.get("name") == target_state:
-            return transition.get("id")
+        if transition.name == target_state:
+            return transition.id
 
     return None
 
@@ -226,184 +183,178 @@ def add_comment(ticket_id: str) -> None:
     :param ticket_id:
     """
 
-    url = f"https://{JIRA_DOMAIN}/rest/api/3/issue/{ticket_id}/comment"
-
-    user = fetch_myself().get("displayName", "JIRA")
+    user = jira_client.fetch_myself().display_name or "JIRA"
     assignee_id = find_assignee_id(ticket_id)
 
-    payload = {
-        "body": {
-            "version": 1,
-            "type": "doc",
-            "content": [
-                {
-                    "type": "paragraph",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"{user} (bot):",
-                            "marks": [
-                                {
-                                    "type": "strong"
-                                },
-                                {
-                                    "type": "underline"
-                                }
-                            ]
-                        }
-                    ]
-                },
-                ## Optional mention
-                *([{
-                    "type": "paragraph",
-                    "content": [
-                        {
-                            "type": "mention",
-                            "attrs": {
-                                "id": f"{assignee_id}"
+    comment = {
+        "version": 1,
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"{user} (bot):",
+                        "marks": [
+                            {
+                                "type": "strong"
+                            },
+                            {
+                                "type": "underline"
                             }
+                        ]
+                    }
+                ]
+            },
+            ## Optional mention
+            *([{
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "mention",
+                        "attrs": {
+                            "id": f"{assignee_id}"
                         }
-                    ]
-                }] if assignee_id else []),
-                {
-                    "type": "paragraph",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "This issue is reopened because it is labelled with "
-                        },
-                        {
-                            "type": "text",
-                            "text": "DeploymentNote",
-                            "marks": [
-                                {
-                                    "type": "code"
-                                }
-                            ]
-                        },
-                        {
-                            "type": "text",
-                            "text": ", and has transitioned to "
-                        },
-                        {
-                            "type": "text",
-                            "text": "Done",
-                            "marks": [
-                                {
-                                    "type": "code"
-                                }
-                            ]
-                        },
-                        {
-                            "type": "text",
-                            "text": ";"
-                        }
-                    ]
-                },
-                {
-                    "type": "paragraph",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "However, cannot find any "
-                        },
-                        {
-                            "type": "text",
-                            "text": "mentioned on",
-                            "marks": [
-                                {
-                                    "type": "code"
-                                }
-                            ]
-                        },
-                        {
-                            "type": "text",
-                            "text": " in the "
-                        },
-                        {
-                            "type": "text",
-                            "text": "Confluence content",
-                            "marks": [
-                                {
-                                    "type": "code"
-                                }
-                            ]
-                        },
-                        {
-                            "type": "text",
-                            "text": " section."
-                        }
-                    ]
-                },
-                {
-                    "type": "paragraph",
-                    "content": []
-                },
-                {
-                    "type": "paragraph",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Please:"
-                        }
-                    ]
-                },
-                {
-                    "type": "bulletList",
-                    "content": [
-                        {
-                            "type": "listItem",
-                            "content": [
-                                {
-                                    "type": "paragraph",
-                                    "content": [
-                                        {
-                                            "type": "text",
-                                            "text": "Prepare the Deployment Note;"
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "type": "listItem",
-                            "content": [
-                                {
-                                    "type": "paragraph",
-                                    "content": [
-                                        {
-                                            "type": "text",
-                                            "text": "Or, if there is, make sure that the Confluence page for Release has "
-                                        },
-                                        {
-                                            "type": "text",
-                                            "text": "explicitly",
-                                            "marks": [
-                                                {
-                                                    "type": "em"
-                                                },
-                                                {
-                                                    "type": "underline"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "type": "text",
-                                            "text": " mentioned this ticket key"
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
-        }
+                    }
+                ]
+            }] if assignee_id else []),
+            {
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "This issue is reopened because it is labelled with "
+                    },
+                    {
+                        "type": "text",
+                        "text": "DeploymentNote",
+                        "marks": [
+                            {
+                                "type": "code"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": ", and has transitioned to "
+                    },
+                    {
+                        "type": "text",
+                        "text": "Done",
+                        "marks": [
+                            {
+                                "type": "code"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": ";"
+                    }
+                ]
+            },
+            {
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "However, cannot find any "
+                    },
+                    {
+                        "type": "text",
+                        "text": "mentioned on",
+                        "marks": [
+                            {
+                                "type": "code"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": " in the "
+                    },
+                    {
+                        "type": "text",
+                        "text": "Confluence content",
+                        "marks": [
+                            {
+                                "type": "code"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": " section."
+                    }
+                ]
+            },
+            {
+                "type": "paragraph",
+                "content": []
+            },
+            {
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Please:"
+                    }
+                ]
+            },
+            {
+                "type": "bulletList",
+                "content": [
+                    {
+                        "type": "listItem",
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "Prepare the Deployment Note;"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "type": "listItem",
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "Or, if there is, make sure that the Confluence page for Release has "
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": "explicitly",
+                                        "marks": [
+                                            {
+                                                "type": "em"
+                                            },
+                                            {
+                                                "type": "underline"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": " mentioned this ticket key"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
     }
 
-    response = requests.post(url, headers=__create_header(), json=payload)
-    response.raise_for_status()
-
+    jira_client.add_comment(ticket_id, comment)
     logging.info(f"[{ticket_id}] Added comment")
     return
 
@@ -414,27 +365,9 @@ def find_assignee_id(ticket_id: str) -> str | None:
     :param ticket_id: The ID of the ticket
     """
 
-    response = fetch_ticket(ticket_id)
-    assignee = response.get("fields", {}).get("assignee")
-    return assignee.get("accountId") if assignee else None
-
-
-def fetch_ticket(ticket_id: str) -> dict:
-    url = f"https://{JIRA_DOMAIN}/rest/api/3/issue/{ticket_id}"
-
-    response = requests.get(url, headers=__create_header())
-    response.raise_for_status()
-
-    return response.json()
-
-
-def fetch_myself() -> dict:
-    url = f"https://{JIRA_DOMAIN}/rest/api/3/myself"
-
-    response = requests.get(url, headers=__create_header())
-    response.raise_for_status()
-
-    return response.json()
+    response: Issue = jira_client.fetch_issue(ticket_id)
+    assignee = response.fields.assignee
+    return assignee.account_id if assignee else None
 
 
 ####
