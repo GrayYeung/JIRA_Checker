@@ -228,7 +228,7 @@ def add_comment(ticket_id: str) -> None:
 
     url = f"https://{JIRA_DOMAIN}/rest/api/3/issue/{ticket_id}/comment"
 
-    user = "Gray"
+    user = fetch_myself().get("displayName", "JIRA")
     assignee_id = find_assignee_id(ticket_id)
 
     payload = {
@@ -407,6 +407,7 @@ def add_comment(ticket_id: str) -> None:
     logging.info(f"[{ticket_id}] Added comment")
     return
 
+
 def find_assignee_id(ticket_id: str) -> str | None:
     """
     Find the assignee id of a ticket.
@@ -417,8 +418,18 @@ def find_assignee_id(ticket_id: str) -> str | None:
     assignee = response.get("fields", {}).get("assignee")
     return assignee.get("accountId") if assignee else None
 
+
 def fetch_ticket(ticket_id: str) -> dict:
     url = f"https://{JIRA_DOMAIN}/rest/api/3/issue/{ticket_id}"
+
+    response = requests.get(url, headers=__create_header())
+    response.raise_for_status()
+
+    return response.json()
+
+
+def fetch_myself() -> dict:
+    url = f"https://{JIRA_DOMAIN}/rest/api/3/myself"
 
     response = requests.get(url, headers=__create_header())
     response.raise_for_status()
