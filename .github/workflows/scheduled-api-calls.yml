@@ -25,4 +25,5 @@ jobs:
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
           JIRA_DOMAIN: ${{ secrets.JIRA_DOMAIN }}
           JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY }}
+          JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE: ${{ vars.JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE }}
         run: python script/check_jira.py
