@@ -19,6 +19,8 @@ def check_for_deployment_note() -> None:
     4. Leave comment as notice
     """
 
+    logging.info("Checking for Deployment Note... ⚠️")
+
     ticket_keys = fetch_tickets()
     logging.info("Found %d target ticket: %s", len(ticket_keys), ticket_keys)
 

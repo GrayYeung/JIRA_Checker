@@ -26,4 +26,5 @@ jobs:
           JIRA_DOMAIN: ${{ secrets.JIRA_DOMAIN }}
           JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY }}
           JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE: ${{ vars.JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE }}
+          JIRA_SHOULD_CHECK_LINKED_DEPENDENCY: ${{ vars.JIRA_SHOULD_CHECK_LINKED_DEPENDENCY }}
         run: python script/check_jira.py
