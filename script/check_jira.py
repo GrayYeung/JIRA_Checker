@@ -377,7 +377,8 @@ def main():
     logging.info(f"Starting JIRA checking script at {hkt} (HKT)...")
 
     try:
-        check_for_deployment_note()
+        if os.getenv('JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE', '').lower() in ('true', '1', 'yes'):
+            check_for_deployment_note()
         logging.info("Done JIRA checking script!")
     except Exception as e:
         logging.error(f"Unexpected error during JIRA checking: {e}")
