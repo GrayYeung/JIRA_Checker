@@ -2,11 +2,11 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from check_deployment_note import check_for_deployment_note
-from helper.property import JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE
+from helper.property import LOGGER_LEVEL, JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE
 
 ## Log config
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=LOGGER_LEVEL, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 

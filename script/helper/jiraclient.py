@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Optional
 
 import requests
@@ -6,7 +7,38 @@ import requests
 
 #### Type ####
 
-class Assignee:
+class Sprint:
+    def __init__(
+            self,
+            name: str,
+            state: str,
+            start_date: datetime,
+            end_date: datetime
+    ):
+        self.name = name
+        self.state = state
+        self.start_date = start_date
+        self.end_date = end_date
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        return cls(
+            name=data.get('name', ''),
+            state=data.get('state', ''),
+            start_date=datetime.fromisoformat(data.get('startDate', '').replace('Z', '+00:00'))
+            if data.get('startDate') else None,
+            end_date=datetime.fromisoformat(data.get('endDate', '').replace('Z', '+00:00'))
+            if data.get('endDate') else None
+        )
+
+    def __str__(self):
+        return f"Sprint(name='{self.name}', state='{self.state}', start_date='{self.start_date}', end_date='{self.end_date}')"
+
+    def __repr__(self):
+        return self.__str__()
+
+
+class UserAccount:
     def __init__(self, account_id: str, email_address: str, display_name: str, active: bool, time_zone: str):
         self.account_id = account_id
         self.email_address = email_address
@@ -41,25 +73,38 @@ class Status:
 
 
 class Fields:
-    def __init__(self, assignee: Optional[Assignee] = None, status: Optional[Status] = None, **kwargs):
+    def __init__(
+            self,
+            assignee: Optional[UserAccount] = None,
+            reporter: Optional[UserAccount] = None,
+            status: Optional[Status] = None,
+            labels: Optional[list[str]] = None,
+            **kwargs
+    ):
         self.assignee = assignee
+        self.reporter = reporter
         self.status = status
+        self.labels = labels
         # Store any additional fields that weren't explicitly defined
         for key, value in kwargs.items():
             setattr(self, key, value)
 
     @classmethod
     def from_dict(cls, data: dict):
-        assignee = Assignee.from_dict(data['assignee']) if data.get('assignee') else None
+        assignee = UserAccount.from_dict(data['assignee']) if data.get('assignee') else None
+        reporter = UserAccount.from_dict(data['reporter']) if data.get('reporter') else None
         status = Status.from_dict(data['status']) if data.get('status') else None
+        labels = data.get('labels', None)
 
         # Extract known fields and pass the rest as kwargs
-        known_fields = {'assignee', 'status'}
+        known_fields = {'assignee', 'reporter', 'status', 'labels'}
         other_fields = {k: v for k, v in data.items() if k not in known_fields}
 
         return cls(
             assignee=assignee,
+            reporter=reporter,
             status=status,
+            labels=labels,
             **other_fields
         )
 
@@ -92,10 +137,11 @@ class Issue:
 
 
 class SearchTicketsParams:
-    def __init__(self, jql: str, fields: list[str], max_results: int = 200):
+    def __init__(self, jql: str, fields: list[str], max_results: int = 200, start_at: int = 0):
         self.jql = jql
         self.fields = ",".join(fields)
         self.maxResults = max_results
+        self.startAt = start_at
 
 
 class SearchTicketsResponse:
@@ -299,6 +345,74 @@ class TransitionsResponse:
         )
 
 
+class LinkedIssue:
+    def __init__(self, key: str, fields: dict):
+        self.key = key
+        self.fields = fields
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        fields = (data.get('fields', {}))
+        return cls(
+            key=data.get('key', ''),
+            fields=fields
+        )
+
+
+class IssueLinkType:
+    def __init__(self, name: str, inward: str, outward: str):
+        self.name = name
+        self.inward = inward
+        self.outward = outward
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        return cls(
+            name=data.get('name', ''),
+            inward=data.get('inward', ''),
+            outward=data.get('outward', ''),
+        )
+
+
+class IssueLink:
+    def __init__(
+            self,
+            id: str,
+            type: IssueLinkType,
+            inward_issue: Optional[LinkedIssue] = None,
+            outward_issue: Optional[LinkedIssue] = None
+    ):
+        self.id = id
+        self.type = type
+        self.inward_issue = inward_issue
+        self.outward_issue = outward_issue
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        id = data.get('id', '')
+        type_obj = IssueLinkType.from_dict(data.get('type', {}))
+        inward_issue = LinkedIssue.from_dict(data['inwardIssue']) if data.get('inwardIssue') else None
+        outward_issue = LinkedIssue.from_dict(data['outwardIssue']) if data.get('outwardIssue') else None
+
+        return cls(
+            id=id,
+            type=type_obj,
+            inward_issue=inward_issue,
+            outward_issue=outward_issue
+        )
+
+    def __str__(self):
+        if self.inward_issue:
+            return f"IssueLink inward ({self.type.inward} -> {self.inward_issue.key})"
+        elif self.outward_issue:
+            return f"IssueLink outward ({self.type.outward} -> {self.outward_issue.key})"
+        else:
+            return f"IssueLink (id={self.id})"
+
+    def __repr__(self):
+        return self.__str__()
+
+
 #### Client ####
 
 class JiraClient:
@@ -372,8 +486,8 @@ class JiraClient:
         response = requests.post(url, headers=self.__create_header(), json=payload)
         response.raise_for_status()
 
-    def fetch_myself(self) -> Assignee:
+    def fetch_myself(self) -> UserAccount:
         url = f"https://{self.jira_domain}/rest/api/3/myself"
         response = requests.get(url, headers=self.__create_header())
         response.raise_for_status()
-        return Assignee.from_dict(response.json())
+        return UserAccount.from_dict(response.json())
