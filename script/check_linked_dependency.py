@@ -2,8 +2,9 @@ import logging
 
 import requests
 
-from helper.jiraclient import Issue, SearchTicketsParams, SearchTicketsResponse, Sprint, IssueLink
-from helper.property import jira_client, JIRA_PROJECT_KEY
+from environment import *
+from jira import *
+from jira.jiramodel import *
 
 ##
 sprint_field = "customfield_10122"  # This is the field ID for the Sprint field in JIRA

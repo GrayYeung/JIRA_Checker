@@ -1,9 +1,8 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from check_deployment_note import check_for_deployment_note
-from check_linked_dependency import check_for_linked_dependency
-from helper.property import LOGGER_LEVEL, JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE, JIRA_SHOULD_CHECK_LINKED_DEPENDENCY
+from environment import *
+from script import check_for_deployment_note, check_for_linked_dependency
 
 ## Log config
 logging.basicConfig(
