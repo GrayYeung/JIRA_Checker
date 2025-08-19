@@ -3,9 +3,9 @@ import re
 
 import requests
 
-from helper.jiraclient import RemoteLink, SearchTicketsParams, SearchTicketsResponse, Transition, TransitionsResponse, \
-    Issue
-from helper.property import jira_client, JIRA_PROJECT_KEY
+from environment import *
+from jira import *
+from jira.jiramodel import *
 
 
 ####
