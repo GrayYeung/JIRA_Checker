@@ -2,11 +2,12 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from check_deployment_note import check_for_deployment_note
-from helper.property import JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE
+from check_linked_dependency import check_for_linked_dependency
+from helper.property import LOGGER_LEVEL, JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE, JIRA_SHOULD_CHECK_LINKED_DEPENDENCY
 
 ## Log config
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=LOGGER_LEVEL, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 
@@ -19,6 +20,9 @@ def main():
     try:
         if JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE:
             check_for_deployment_note()
+
+        if JIRA_SHOULD_CHECK_LINKED_DEPENDENCY:
+            check_for_linked_dependency()
         logging.info("Done JIRA checking script!")
     except Exception as e:
         logging.error(f"Unexpected error during JIRA checking: {e}")
