@@ -55,7 +55,7 @@ def check_for_linked_dependency():
                     linked_ticket_sprints = extract_sprints(linked_ticket)
 
                     if not is_origin_started_later(ticket_sprints, linked_ticket_sprints):
-                        msg = f"{ticket_id} should be at later sprint than {linked_ticket.key}"
+                        msg = f"{ticket_id} should be at later/same sprint than {linked_ticket.key}"
                         logging.warning(f"[{ticket_id}] {msg} (Linked ticket) ❌")
                         warnings.append(msg)
 
@@ -64,7 +64,7 @@ def check_for_linked_dependency():
                     linked_ticket_sprints = extract_sprints(linked_ticket)
 
                     if not is_origin_started_earlier(ticket_sprints, linked_ticket_sprints):
-                        msg = f"{ticket_id} should be at earlier sprint than {linked_ticket.key}"
+                        msg = f"{ticket_id} should be at earlier/same sprint than {linked_ticket.key}"
                         logging.warning(f"[{ticket_id}] {msg} (Linked ticket) ❌")
                         warnings.append(msg)
 
