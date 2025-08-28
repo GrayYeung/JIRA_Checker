@@ -132,8 +132,31 @@ def do_transition(ticket_id: str) -> None:
 
     response: TransitionsResponse = jira_client.fetch_transitions(ticket_id)
     available_transitions = response.transitions
-
     target_state = "Rework"
+    target_state_id = find_target_state_id(available_transitions, target_state)
+
+    if not target_state_id:
+        logging.error(f"[{ticket_id}] Target state '{target_state}' not found, trying to transit with special workflow")
+        ## e.g.: for incident type
+        perform_transition_for_special_workflow(ticket_id)
+        return
+
+    ## Perform the transition
+    perform_transition(ticket_id, target_state)
+    return
+
+
+def find_target_state_id(transitions: list[Transition], target_state: str) -> str | None:
+    for transition in transitions:
+        if transition.name == target_state:
+            return transition.id
+
+    return None
+
+
+def perform_transition(ticket_id: str, target_state: str) -> None:
+    response: TransitionsResponse = jira_client.fetch_transitions(ticket_id)
+    available_transitions = response.transitions
     target_state_id = find_target_state_id(available_transitions, target_state)
 
     if not target_state_id:
@@ -146,12 +169,15 @@ def do_transition(ticket_id: str) -> None:
     return
 
 
-def find_target_state_id(transitions: list[Transition], target_state: str) -> str | None:
-    for transition in transitions:
-        if transition.name == target_state:
-            return transition.id
+def perform_transition_for_special_workflow(ticket_id: str) -> None:
+    transition_states = [
+        "Ready (for Testing)",
+        "Testing In Progress",
+        "Rework"
+    ]
 
-    return None
+    for state in transition_states:
+        perform_transition(ticket_id, state)
 
 
 def add_comment(ticket_id: str) -> None:
