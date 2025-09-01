@@ -17,24 +17,25 @@ def main():
     hkt = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
     logging.info(f"Starting JIRA checking script at {hkt} (HKT)...")
 
-    is_all_good = True
+    results = []
 
     try:
         if JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE:
             result = check_for_deployment_note()
-            if not result:
-                is_all_good = False
+            results.append(result)
 
         if JIRA_SHOULD_CHECK_LINKED_DEPENDENCY:
             result = check_for_linked_dependency()
-            if not result:
-                is_all_good = False
+            results.append(result)
+
         logging.info("Done JIRA checking script!")
     except Exception as e:
         logging.error(f"Unexpected error during JIRA checking: {e}")
         raise e
 
+    is_all_good = all(results)
     if not is_all_good:
+        ## Raise to trigger alert from GH Actions
         raise UnexpectedException("One or more checks failed. Please review the logs for details.")
 
 
