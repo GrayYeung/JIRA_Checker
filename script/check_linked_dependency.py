@@ -15,6 +15,9 @@ whitelisted_label = "SuppressScanning"
 
 
 def check_for_linked_dependency():
+    """
+    :return: `true` if ticket contains a valid remote link
+    """
     logging.info("Checking for linked dependencies... ⚠️")
 
     tickets = fetch_tickets()
@@ -83,7 +86,7 @@ def check_for_linked_dependency():
                  len(bad_tickets), bad_tickets,
                  len(error_tickets), error_tickets
                  )
-    return
+    return len(error_tickets) == 0
 
 
 ####

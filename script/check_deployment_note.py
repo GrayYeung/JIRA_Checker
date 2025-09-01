@@ -4,19 +4,22 @@ import re
 import requests
 
 from environment import *
+from exception.exceptionmodel import UnexpectedException
 from jira import *
 from jira.jiramodel import *
 
 
 ####
 
-def check_for_deployment_note() -> None:
+def check_for_deployment_note() -> bool:
     """
     Step of checking:
     1. Sort-out potential target tickets
     2. Evaluate isTarget
     3. Perform transition to "Rework"
     4. Leave comment as notice
+
+    :return: `true` if all operations succeed
     """
 
     logging.info("Checking for Deployment Note... ⚠️")
@@ -37,8 +40,8 @@ def check_for_deployment_note() -> None:
                 add_comment(ticket_id)
                 bad_tickets.append(ticket_id)
                 continue
-        except requests.exceptions.RequestException as e:
-            logging.error(f"[{ticket_id}] Encountered RequestException: {e}")
+        except (requests.exceptions.RequestException, UnexpectedException) as e:
+            logging.error(f"[{ticket_id}] Encountered {type(e).__name__}: {e.message}")
             error_tickets.append(ticket_id)
             continue
 
@@ -46,7 +49,7 @@ def check_for_deployment_note() -> None:
                  len(bad_tickets), bad_tickets,
                  len(error_tickets), error_tickets
                  )
-    return
+    return len(error_tickets) == 0
 
 
 ####
@@ -130,20 +133,13 @@ def do_transition(ticket_id: str) -> None:
     :param ticket_id:
     """
 
-    response: TransitionsResponse = jira_client.fetch_transitions(ticket_id)
-    available_transitions = response.transitions
-    target_state = "Rework"
-    target_transition_id = find_target_transition_id(available_transitions, target_state)
-
-    if not target_transition_id:
-        logging.error(f"[{ticket_id}] Target state '{target_state}' not found, trying to transit with special workflow")
+    try:
+        ## Perform the transition once
+        target_state = "Rework"
+        perform_transition(ticket_id, target_state)
+    except UnexpectedException:
         ## e.g.: for incident type
         perform_transition_for_special_workflow(ticket_id)
-        return
-
-    ## Perform the transition
-    perform_transition(ticket_id, target_state)
-    return
 
 
 def find_target_transition_id(transitions: list[Transition], target_state: str) -> str | None:
@@ -161,8 +157,9 @@ def perform_transition(ticket_id: str, target_state: str) -> None:
     target_transition_id = find_target_transition_id(available_transitions, target_state)
 
     if not target_transition_id:
-        logging.error(f"[{ticket_id}] Target state '{target_state}' not found")
-        return
+        error_msg = f"[{ticket_id}] Target state '{target_state}' not found"
+        logging.error(error_msg)
+        raise UnexpectedException(error_msg)
 
     ## Perform the transition
     jira_client.do_transition(ticket_id, target_transition_id)
