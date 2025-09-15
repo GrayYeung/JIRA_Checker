@@ -24,7 +24,7 @@ class JiraClient:
         }
 
     def fetch_search(self, params: SearchTicketsParams) -> SearchTicketsResponse:
-        url = f'https://{self.jira_domain}/rest/api/3/search'
+        url = f'https://{self.jira_domain}/rest/api/3/search/jql'
         response = requests.get(url, headers=self.__create_header(), params=vars(params))
         response.raise_for_status()
         return SearchTicketsResponse.from_dict(response.json())
