@@ -133,29 +133,25 @@ class Issue:
 
 
 class SearchTicketsParams:
-    def __init__(self, jql: str, fields: list[str], max_results: int = 200, start_at: int = 0):
+    def __init__(self, jql: str, fields: list[str], max_results: int = 200, next_page_token: str = None):
         self.jql = jql
         self.fields = ",".join(fields)
         self.maxResults = max_results
-        self.startAt = start_at
+        self.nextPageToken = next_page_token
 
 
 class SearchTicketsResponse:
-    def __init__(self, expand: str, start_at: int, max_results: int, total: int, issues: list[Issue]):
-        self.expand = expand
-        self.start_at = start_at
-        self.max_results = max_results
-        self.total = total
+    def __init__(self, is_last: bool, next_page_token: str, issues: list[Issue]):
+        self.isLast = is_last
+        self.nextPageToken = next_page_token
         self.issues = issues
 
     @classmethod
     def from_dict(cls, data: dict):
         issues = [Issue.from_dict(issue_data) for issue_data in data.get('issues', [])]
         return cls(
-            expand=data.get('expand', ''),
-            start_at=data.get('startAt', 0),
-            max_results=data.get('maxResults', 0),
-            total=data.get('total', 0),
+            is_last=data.get('isLast', True),
+            next_page_token=data.get('nextPageToken'),
             issues=issues
         )
 
