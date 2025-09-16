@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from environment import *
 from exception.exceptionmodel import UnexpectedException
-from script import check_for_deployment_note, check_for_linked_dependency
+from script import check_for_deployment_note, check_for_linked_dependency, check_open_git_pull_request
 
 ## Log config
 logging.basicConfig(
@@ -27,6 +27,8 @@ def main():
         if JIRA_SHOULD_CHECK_LINKED_DEPENDENCY:
             result = check_for_linked_dependency()
             results.append(result)
+
+        check_open_git_pull_request()
 
         logging.info("Done JIRA checking script!")
     except Exception as e:

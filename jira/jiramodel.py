@@ -403,3 +403,22 @@ class IssueLink:
 
     def __repr__(self):
         return self.__str__()
+
+
+class GraphqlQueryParam:
+    def __init__(
+            self,
+            operation_name: str,
+            query: str,
+            variables: dict
+    ):
+        self.operationName = operation_name
+        self.query = query
+        self.variables = variables
+
+    def to_dict(self) -> dict:
+        return {
+            'operationName': self.operationName,
+            'query': self.query,
+            'variables': self.variables
+        }

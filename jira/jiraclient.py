@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 import requests
 
@@ -83,3 +84,58 @@ class JiraClient:
         response = requests.get(url, headers=self.__create_header())
         response.raise_for_status()
         return UserAccount.from_dict(response.json())
+
+    def invoke_graphql(self, payload: GraphqlQueryParam) -> dict[str, Any]:
+        url = f"https://{self.jira_domain}/jsw2/graphql"
+        response = requests.post(url, headers=self.__create_header(), json=payload.to_dict())
+        response.raise_for_status()
+        return response.json()
+
+    def get_dev_summary_panel_one_click_urls(self, issue_id: str) -> dict[str, Any]:
+        operation_name = 'DevSummaryPanelOneClickUrls'
+        query = """
+                query DevSummaryPanelOneClickUrls($issueId: ID!) {
+                    developmentInformation(issueId: $issueId) {
+                        details {
+                            instanceTypes {
+                                id
+                                type
+                                devStatusErrorMessages
+                                repository {
+                                    avatarUrl
+                                    name
+                                    branches {
+                                        createPullRequestUrl
+                                        name
+                                        url
+                                    }
+                                    commits {
+                                        url
+                                    }
+                                    pullRequests {
+                                        url
+                                        status
+                                    }
+                                }
+                                danglingPullRequests {
+                                    url
+                                    status
+                                }
+                                buildProviders {
+                                    id
+                                    builds {
+                                        url
+                                        state
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+        """
+        variables = {
+            "issueId": issue_id
+        }
+
+        payload = GraphqlQueryParam(operation_name, query, variables)
+        return self.invoke_graphql(payload)
