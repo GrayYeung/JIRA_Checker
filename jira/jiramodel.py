@@ -1,20 +1,15 @@
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, List
 
 
 #### Type ####
+@dataclass
 class Sprint:
-    def __init__(
-            self,
-            name: str,
-            state: str,
-            start_date: datetime,
-            end_date: datetime
-    ):
-        self.name = name
-        self.state = state
-        self.start_date = start_date
-        self.end_date = end_date
+    name: str
+    state: str
+    start_date: Optional[datetime]
+    end_date: Optional[datetime]
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -27,20 +22,14 @@ class Sprint:
             if data.get('endDate') else None
         )
 
-    def __str__(self):
-        return f"Sprint(name='{self.name}', state='{self.state}', start_date='{self.start_date}', end_date='{self.end_date}')"
 
-    def __repr__(self):
-        return self.__str__()
-
-
+@dataclass
 class UserAccount:
-    def __init__(self, account_id: str, email_address: str, display_name: str, active: bool, time_zone: str):
-        self.account_id = account_id
-        self.email_address = email_address
-        self.display_name = display_name
-        self.active = active
-        self.time_zone = time_zone
+    account_id: str = ''
+    email_address: str = ''
+    display_name: str = ''
+    active: bool = False
+    time_zone: str = ''
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -53,11 +42,11 @@ class UserAccount:
         )
 
 
+@dataclass
 class Status:
-    def __init__(self, id: str, name: str, description: str):
-        self.id = id
-        self.name = name
-        self.description = description
+    id: str = ''
+    name: str = ''
+    description: str = ''
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -68,22 +57,16 @@ class Status:
         )
 
 
+@dataclass
 class Fields:
-    def __init__(
-            self,
-            assignee: Optional[UserAccount] = None,
-            reporter: Optional[UserAccount] = None,
-            status: Optional[Status] = None,
-            labels: Optional[list[str]] = None,
-            **kwargs
-    ):
-        self.assignee = assignee
-        self.reporter = reporter
-        self.status = status
-        self.labels = labels
-        # Store any additional fields that weren't explicitly defined
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+    assignee: Optional[UserAccount] = None
+    reporter: Optional[UserAccount] = None
+    status: Optional[Status] = None
+    labels: Optional[List[str]] = None
+
+    def __post_init__(self):
+        # This will be used to store additional fields
+        pass
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -92,33 +75,30 @@ class Fields:
         status = Status.from_dict(data['status']) if data.get('status') else None
         labels = data.get('labels', None)
 
-        # Extract known fields and pass the rest as kwargs
-        known_fields = {'assignee', 'reporter', 'status', 'labels'}
-        other_fields = {k: v for k, v in data.items() if k not in known_fields}
-
-        return cls(
+        # Create instance
+        instance = cls(
             assignee=assignee,
             reporter=reporter,
             status=status,
-            labels=labels,
-            **other_fields
+            labels=labels
         )
 
+        # Store any additional fields that weren't explicitly defined
+        known_fields = {'assignee', 'reporter', 'status', 'labels'}
+        for key, value in data.items():
+            if key not in known_fields:
+                setattr(instance, key, value)
 
+        return instance
+
+
+@dataclass
 class Issue:
-    def __init__(
-            self,
-            id: str,
-            key: str,
-            self_url: str,
-            expand: str,
-            fields: Fields
-    ):
-        self.id = id
-        self.key = key
-        self.self_url = self_url
-        self.expand = expand
-        self.fields = fields
+    id: str = ''
+    key: str = ''
+    self_url: str = ''
+    expand: str = ''
+    fields: Optional[Fields] = None
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -132,54 +112,60 @@ class Issue:
         )
 
 
+@dataclass
 class SearchTicketsParams:
-    def __init__(self, jql: str, fields: list[str], max_results: int = 200, next_page_token: str = None):
+    jql: str
+    fields: str = field(init=False)
+    maxResults: int = 200
+    nextPageToken: Optional[str] = None
+
+    def __init__(self, jql: str, fields: List[str], max_results: int = 200, next_page_token: str = None):
         self.jql = jql
         self.fields = ",".join(fields)
         self.maxResults = max_results
         self.nextPageToken = next_page_token
 
 
+@dataclass
 class SearchTicketsResponse:
-    def __init__(self, is_last: bool, next_page_token: str, issues: list[Issue]):
-        self.isLast = is_last
-        self.nextPageToken = next_page_token
-        self.issues = issues
+    isLast: bool
+    nextPageToken: Optional[str]
+    issues: List[Issue] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict):
         issues = [Issue.from_dict(issue_data) for issue_data in data.get('issues', [])]
         return cls(
-            is_last=data.get('isLast', True),
-            next_page_token=data.get('nextPageToken'),
+            isLast=data.get('isLast', True),
+            nextPageToken=data.get('nextPageToken'),
             issues=issues
         )
 
 
+@dataclass
 class RemoteLinkStatusIcon:
-    def __init__(self, icon: Optional[dict] = None):
-        self.icon = icon or {}
+    icon: Dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict):
         return cls(icon=data.get('icon', {}))
 
 
+@dataclass
 class RemoteLinkStatus:
-    def __init__(self, icon: Optional[dict] = None):
-        self.icon = icon or {}
+    icon: Dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict):
         return cls(icon=data.get('icon', {}))
 
 
+@dataclass
 class RemoteLinkObject:
-    def __init__(self, url: str, title: str, icon: Optional[dict] = None, status: Optional[RemoteLinkStatus] = None):
-        self.url = url
-        self.title = title
-        self.icon = icon or {}
-        self.status = status
+    url: str = ''
+    title: str = ''
+    icon: Dict = field(default_factory=dict)
+    status: Optional[RemoteLinkStatus] = None
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -194,20 +180,13 @@ class RemoteLinkObject:
         )
 
 
+@dataclass
 class RemoteLink:
-    def __init__(
-            self,
-            id: int,
-            self_url: str,
-            global_id: str,
-            relationship: str,
-            object: RemoteLinkObject
-    ):
-        self.id = id
-        self.self_url = self_url
-        self.global_id = global_id
-        self.relationship = relationship
-        self.object = object
+    id: int = 0
+    self_url: str = ''
+    global_id: str = ''
+    relationship: str = ''
+    object: Optional[RemoteLinkObject] = None
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -220,22 +199,14 @@ class RemoteLink:
         )
 
 
+@dataclass
 class ConfluencePageVersion:
-    def __init__(
-            self,
-            number: int,
-            message: str,
-            minor_edit: bool,
-            author_id: str,
-            created_at: str,
-            ncs_step_version: str
-    ):
-        self.number = number
-        self.message = message
-        self.minor_edit = minor_edit
-        self.author_id = author_id
-        self.created_at = created_at
-        self.ncs_step_version = ncs_step_version
+    number: int = 0
+    message: str = ''
+    minor_edit: bool = False
+    author_id: str = ''
+    created_at: str = ''
+    ncs_step_version: str = ''
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -249,14 +220,10 @@ class ConfluencePageVersion:
         )
 
 
+@dataclass
 class ConfluencePage:
-    def __init__(
-            self,
-            title: str,
-            id: str,
-    ):
-        self.title = title
-        self.id = id
+    title: str = ''
+    id: str = ''
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -266,13 +233,13 @@ class ConfluencePage:
         )
 
 
+@dataclass
 class TransitionStatus:
-    def __init__(self, self_url: str, description: str, icon_url: str, name: str, id: str):
-        self.self_url = self_url
-        self.description = description
-        self.icon_url = icon_url
-        self.name = name
-        self.id = id
+    self_url: str = ''
+    description: str = ''
+    icon_url: str = ''
+    name: str = ''
+    id: str = ''
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -285,28 +252,17 @@ class TransitionStatus:
         )
 
 
+@dataclass
 class Transition:
-    def __init__(
-            self,
-            id: str,
-            name: str,
-            to: TransitionStatus,
-            has_screen: bool,
-            is_global: bool,
-            is_initial: bool,
-            is_available: bool,
-            is_conditional: bool,
-            is_looped: bool
-    ):
-        self.id = id
-        self.name = name
-        self.to = to
-        self.has_screen = has_screen
-        self.is_global = is_global
-        self.is_initial = is_initial
-        self.is_available = is_available
-        self.is_conditional = is_conditional
-        self.is_looped = is_looped
+    id: str = ''
+    name: str = ''
+    to: Optional[TransitionStatus] = None
+    has_screen: bool = False
+    is_global: bool = False
+    is_initial: bool = False
+    is_available: bool = False
+    is_conditional: bool = False
+    is_looped: bool = False
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -323,10 +279,10 @@ class Transition:
         )
 
 
+@dataclass
 class TransitionsResponse:
-    def __init__(self, expand: str, transitions: list[Transition]):
-        self.expand = expand
-        self.transitions = transitions
+    expand: str = ''
+    transitions: List[Transition] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -337,25 +293,25 @@ class TransitionsResponse:
         )
 
 
+@dataclass
 class LinkedIssue:
-    def __init__(self, key: str, fields: dict):
-        self.key = key
-        self.fields = fields
+    key: str = ''
+    fields: Dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict):
-        fields = (data.get('fields', {}))
+        fields = data.get('fields', {})
         return cls(
             key=data.get('key', ''),
             fields=fields
         )
 
 
+@dataclass
 class IssueLinkType:
-    def __init__(self, name: str, inward: str, outward: str):
-        self.name = name
-        self.inward = inward
-        self.outward = outward
+    name: str = ''
+    inward: str = ''
+    outward: str = ''
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -366,18 +322,12 @@ class IssueLinkType:
         )
 
 
+@dataclass
 class IssueLink:
-    def __init__(
-            self,
-            id: str,
-            type: IssueLinkType,
-            inward_issue: Optional[LinkedIssue] = None,
-            outward_issue: Optional[LinkedIssue] = None
-    ):
-        self.id = id
-        self.type = type
-        self.inward_issue = inward_issue
-        self.outward_issue = outward_issue
+    id: str = ''
+    type: Optional[IssueLinkType] = None
+    inward_issue: Optional[LinkedIssue] = None
+    outward_issue: Optional[LinkedIssue] = None
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -401,20 +351,12 @@ class IssueLink:
         else:
             return f"IssueLink (id={self.id})"
 
-    def __repr__(self):
-        return self.__str__()
 
-
+@dataclass
 class GraphqlQueryParam:
-    def __init__(
-            self,
-            operation_name: str,
-            query: str,
-            variables: dict
-    ):
-        self.operationName = operation_name
-        self.query = query
-        self.variables = variables
+    operationName: str
+    query: str
+    variables: Dict
 
     def to_dict(self) -> dict:
         return {
