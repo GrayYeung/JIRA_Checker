@@ -3,6 +3,7 @@ from typing import Any
 
 import requests
 
+from .dev_summary_panel_model import *
 from .jiramodel import *
 
 
@@ -91,7 +92,7 @@ class JiraClient:
         response.raise_for_status()
         return response.json()
 
-    def get_dev_summary_panel_one_click_urls(self, issue_id: str) -> dict[str, Any]:
+    def get_dev_summary_panel_one_click_urls(self, issue_id: str) -> DevSummaryPanelResponse:
         operation_name = 'DevSummaryPanelOneClickUrls'
         query = """
                 query DevSummaryPanelOneClickUrls($issueId: ID!) {
@@ -138,4 +139,5 @@ class JiraClient:
         }
 
         payload = GraphqlQueryParam(operation_name, query, variables)
-        return self.invoke_graphql(payload)
+        response = self.invoke_graphql(payload)
+        return DevSummaryPanelResponse.from_dict(response)

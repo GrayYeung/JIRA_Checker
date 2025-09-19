@@ -7,6 +7,7 @@ from environment import *
 from exception.exceptionmodel import UnexpectedException
 from jira import *
 from jira.jiramodel import *
+from .utils import print_conclusion
 
 
 ####
@@ -24,42 +25,40 @@ def check_for_deployment_note() -> bool:
 
     logging.info("Checking for Deployment Note... ⚠️")
 
-    ticket_keys = fetch_tickets()
+    tickets = fetch_tickets()
+    ticket_keys = [ticket.key for ticket in tickets]
     logging.info("Found %d target ticket: %s", len(ticket_keys), ticket_keys)
 
-    bad_tickets = []
-    error_tickets = []
-    for ticket_id in ticket_keys:
-        logging.info(f"[{ticket_id}] Processing ticket...")
+    bad_tickets: list[str] = []
+    error_tickets: list[str] = []
+
+    for ticket in tickets:
+        ticket_key = ticket.key
+        logging.info(f"[{ticket_key}] Processing ticket...")
 
         try:
-            remote_links_response: list[RemoteLink] = jira_client.fetch_remote_link(ticket_id)
+            remote_links_response: list[RemoteLink] = jira_client.fetch_remote_link(ticket_key)
 
-            if not is_valid(remote_links_response, ticket_id):
-                do_transition(ticket_id)
-                add_comment(ticket_id)
-                bad_tickets.append(ticket_id)
+            if not is_valid(remote_links_response, ticket_key):
+                ## Action
+                do_transition(ticket_key)
+                add_comment(ticket)
+
+                bad_tickets.append(ticket_key)
                 continue
         except (requests.exceptions.RequestException, UnexpectedException) as e:
-            logging.error(f"[{ticket_id}] Encountered {type(e).__name__}: {e.message}")
-            error_tickets.append(ticket_id)
+            logging.error(f"[{ticket_key}] Encountered {type(e).__name__}: {e.message}")
+            error_tickets.append(ticket_key)
             continue
 
-    logging.info("Conclusion: \n%d bad tickets: %s, \n%d error tickets: %s",
-                 len(bad_tickets), bad_tickets,
-                 len(error_tickets), error_tickets
-                 )
+    print_conclusion(bad_tickets, error_tickets)
     return len(error_tickets) == 0
 
 
 ####
 
-def fetch_tickets() -> list[str]:
-    """
-    :return: List of ticket Ids
-    """
-
-    # get the last week updated tickets with DeploymentNote label
+def fetch_tickets() -> list[Issue]:
+    ## get the last week updated tickets with DeploymentNote label
     status_list = ['"DONE (Development)"', 'Accepted']
     time_range = "5d"  # e.g.: h,d,w
     project = JIRA_PROJECT_KEY
@@ -75,10 +74,7 @@ def fetch_tickets() -> list[str]:
     logging.info("Fetching tickets with JQL: '%s'...", jql)
     response: SearchTicketsResponse = jira_client.fetch_search(params)
 
-    return [
-        issue.key
-        for issue in response.issues
-    ]
+    return response.issues
 
 
 def is_valid(remote_link_resp: list[RemoteLink], key: str) -> bool:
@@ -178,16 +174,15 @@ def perform_transition_for_special_workflow(ticket_id: str) -> None:
         perform_transition(ticket_id, state)
 
 
-def add_comment(ticket_id: str) -> None:
+def add_comment(ticket: Issue) -> None:
     """
     Add a comment to the ticket to notify about the transition.
     For simplicity, we will use a static comment.
-
-    :param ticket_id:
     """
 
+    ticket_id = ticket.key
     user = jira_client.fetch_myself().display_name or "JIRA"
-    assignee_id = find_assignee_id(ticket_id)
+    assignee_id = find_assignee_id(ticket)
 
     comment = {
         "version": 1,
@@ -362,12 +357,10 @@ def add_comment(ticket_id: str) -> None:
     return
 
 
-def find_assignee_id(ticket_id: str) -> str | None:
+def find_assignee_id(ticket: Issue) -> str | None:
     """
     Find the assignee id of a ticket.
-    :param ticket_id: The ID of the ticket
     """
 
-    response: Issue = jira_client.fetch_issue(ticket_id)
-    assignee = response.fields.assignee
+    assignee = ticket.fields.assignee
     return assignee.account_id if assignee else None
