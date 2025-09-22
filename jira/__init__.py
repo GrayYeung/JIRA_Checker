@@ -1,4 +1,5 @@
 from environment import *
+from . import dev_summary_panel_model
 from . import jiramodel
 from .jiraclient import JiraClient
 
@@ -11,5 +12,8 @@ __all__ = [
     'jira_client',
 
     # Core Models
-    'jiramodel'
+    'jiramodel',
+
+    # GraphQL Models
+    'dev_summary_panel_model'
 ]

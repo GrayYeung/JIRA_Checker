@@ -1,7 +1,9 @@
 import logging
+from typing import Any
 
 import requests
 
+from .dev_summary_panel_model import *
 from .jiramodel import *
 
 
@@ -29,14 +31,14 @@ class JiraClient:
         response.raise_for_status()
         return SearchTicketsResponse.from_dict(response.json())
 
-    def fetch_issue(self, ticket_id: str) -> Issue:
-        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_id}"
+    def fetch_issue(self, ticket_key: str) -> Issue:
+        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_key}"
         response = requests.get(url, headers=self.__create_header())
         response.raise_for_status()
         return Issue.from_dict(response.json())
 
-    def fetch_remote_link(self, ticket_id: str) -> list[RemoteLink]:
-        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_id}/remotelink"
+    def fetch_remote_link(self, ticket_key: str) -> list[RemoteLink]:
+        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_key}/remotelink"
         response = requests.get(url, headers=self.__create_header())
         response.raise_for_status()
         data = response.json()
@@ -52,15 +54,15 @@ class JiraClient:
             logging.error(f"Error fetching Confluence content for page {page_id}: {e}")
             return None
 
-    def fetch_transitions(self, ticket_id: str) -> TransitionsResponse:
+    def fetch_transitions(self, ticket_key: str) -> TransitionsResponse:
         """Fetch available transitions for a ticket, type-safe."""
-        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_id}/transitions"
+        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_key}/transitions"
         response = requests.get(url, headers=self.__create_header())
         response.raise_for_status()
         return TransitionsResponse.from_dict(response.json())
 
-    def do_transition(self, ticket_id: str, transition_id: str) -> None:
-        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_id}/transitions"
+    def do_transition(self, ticket_key: str, transition_id: str) -> None:
+        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_key}/transitions"
         payload = {
             "transition": {
                 "id": transition_id
@@ -69,8 +71,8 @@ class JiraClient:
         response = requests.post(url, headers=self.__create_header(), json=payload)
         response.raise_for_status()
 
-    def add_comment(self, ticket_id: str, comment: dict) -> None:
-        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_id}/comment"
+    def add_comment(self, ticket_key: str, comment: dict) -> None:
+        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_key}/comment"
         payload = {
             "body": comment,
             "visibility": None  ## null
@@ -83,3 +85,59 @@ class JiraClient:
         response = requests.get(url, headers=self.__create_header())
         response.raise_for_status()
         return UserAccount.from_dict(response.json())
+
+    def invoke_graphql(self, payload: GraphqlQueryParam) -> dict[str, Any]:
+        url = f"https://{self.jira_domain}/jsw2/graphql"
+        response = requests.post(url, headers=self.__create_header(), json=payload.to_dict())
+        response.raise_for_status()
+        return response.json()
+
+    def get_dev_summary_panel_one_click_urls(self, issue_id: str) -> DevSummaryPanelResponse:
+        operation_name = 'DevSummaryPanelOneClickUrls'
+        query = """
+                query DevSummaryPanelOneClickUrls($issueId: ID!) {
+                    developmentInformation(issueId: $issueId) {
+                        details {
+                            instanceTypes {
+                                id
+                                type
+                                devStatusErrorMessages
+                                repository {
+                                    avatarUrl
+                                    name
+                                    branches {
+                                        createPullRequestUrl
+                                        name
+                                        url
+                                    }
+                                    commits {
+                                        url
+                                    }
+                                    pullRequests {
+                                        url
+                                        status
+                                    }
+                                }
+                                danglingPullRequests {
+                                    url
+                                    status
+                                }
+                                buildProviders {
+                                    id
+                                    builds {
+                                        url
+                                        state
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+        """
+        variables = {
+            "issueId": issue_id
+        }
+
+        payload = GraphqlQueryParam(operation_name, query, variables)
+        response = self.invoke_graphql(payload)
+        return DevSummaryPanelResponse.from_dict(response)
