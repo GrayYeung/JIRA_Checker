@@ -39,7 +39,7 @@ def check_for_deployment_note() -> bool:
         try:
             remote_links_response: list[RemoteLink] = jira_client.fetch_remote_link(ticket_key)
 
-            if not is_valid(remote_links_response, ticket_key):
+            if not is_valid(remote_links_response, ticket):
                 ## Action
                 do_transition(ticket_key)
                 add_comment(ticket)
@@ -64,7 +64,7 @@ def fetch_tickets() -> list[Issue]:
     project = JIRA_PROJECT_KEY
 
     jql = f'updated >= -{time_range} and labels IN (DeploymentNote) and status IN ({", ".join(status_list)}) and project = {project}'
-    fields = ["assignee", "status"]
+    fields = ["assignee", "status", "fixVersions"]
 
     params = SearchTicketsParams(
         jql=jql,
@@ -77,16 +77,18 @@ def fetch_tickets() -> list[Issue]:
     return response.issues
 
 
-def is_valid(remote_link_resp: list[RemoteLink], key: str) -> bool:
+def is_valid(remote_link_resp: list[RemoteLink], ticket: Issue) -> bool:
     """
     Validate by:
     1. Extract each remote link by `relationship` field
     2. Invoke the remote link API to examine its content
 
-    :param key: Ticket key
+    :param ticket: Ticket
     :param remote_link_resp: See fetch_remote_link
     :return: `true` if ticket contains a valid remote link
     """
+
+    key = ticket.key
 
     if not remote_link_resp:
         logging.info(f"[{key}] No remote links found")
@@ -106,8 +108,12 @@ def is_valid(remote_link_resp: list[RemoteLink], key: str) -> bool:
             if not content:
                 continue
 
-            title = content.title
-            if "release" in title.lower():
+            version = extract_version(content.title)
+            if not version:
+                continue
+
+            is_match = is_match_with_issue(version, ticket)
+            if is_match:
                 logging.info(f"[{key}] Found valid remote link for page_id: {page_id} ✅")
                 return True
 
@@ -121,6 +127,28 @@ def extract_page_id(url: str) -> Optional[str]:
     if match:
         return match.group(1)
     return None
+
+
+def extract_version(title: str) -> Optional[str]:
+    ## Assume title contain "Release X.Y.Z" or "Release some feature" pattern
+    title = title.lower()
+    match = re.search(r'release([a-zA-Z0-9\s._-]+)', title)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
+def is_match_with_issue(candidate: str, ticket: Issue) -> bool:
+    versions = getattr(ticket.fields, "fixVersions", None) if ticket.fields else None
+    if not versions:
+        return False
+
+    for version_data in versions:
+        version = FixVersion.from_dict(version_data)
+        if version.name and candidate.lower() in version.name.lower():
+            return True
+
+    return False
 
 
 def do_transition(ticket_key: str) -> None:
