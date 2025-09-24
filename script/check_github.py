@@ -183,7 +183,7 @@ def add_comment(ticket: Issue, open_prs: list[PullRequest]):
                 "content": [
                     {
                         "type": "text",
-                        "text": "Found some PRs are still "
+                        "text": "From 'Development' session by GitHub plugin, found some PRs are still "
                     },
                     {
                         "type": "text",
@@ -250,6 +250,20 @@ def add_comment(ticket: Issue, open_prs: list[PullRequest]):
                                     {
                                         "type": "text",
                                         "text": "Check the PR status on GitHub;"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "type": "listItem",
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "Or, consider to convert the PR into DRAFT;"
                                     }
                                 ]
                             }
