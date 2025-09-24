@@ -58,6 +58,28 @@ class Status:
 
 
 @dataclass
+class FixVersion:
+    id: str = ''
+    name: str = ''
+    description: str = ''
+    archived: bool = False
+    released: bool = False
+    releaseDate: Optional[datetime] = None
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        return cls(
+            id=data.get('id', ''),
+            name=data.get('name', ''),
+            description=data.get('description', ''),
+            archived=data.get('archived', False),
+            released=data.get('released', False),
+            releaseDate=datetime.fromisoformat(data.get('releaseDate', '').replace('Z', '+00:00'))
+            if data.get('releaseDate') else None
+        )
+
+
+@dataclass
 class Fields:
     assignee: Optional[UserAccount] = None
     reporter: Optional[UserAccount] = None
