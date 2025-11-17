@@ -7,7 +7,10 @@ from environment import *
 from exception.exceptionmodel import UnexpectedException
 from jira import *
 from jira.jiramodel import *
-from .utils import print_conclusion, extract_assignee_id
+from .utils import print_conclusion, should_skip_by_label, extract_assignee_id
+
+##
+whitelisted_label = "SuppressScanning"
 
 
 ####
@@ -37,6 +40,10 @@ def check_for_deployment_note() -> bool:
         logging.info(f"[{ticket_key}] Processing ticket...")
 
         try:
+            if should_skip_by_label(ticket, whitelisted_label):
+                logging.info(f"[{ticket_key}] Skipping due to whitelisted label...")
+                continue
+
             remote_links_response: list[RemoteLink] = jira_client.fetch_remote_link(ticket_key)
 
             if not is_valid(remote_links_response, ticket):
