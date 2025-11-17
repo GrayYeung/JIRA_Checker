@@ -7,11 +7,12 @@ JIRA_DOMAIN = os.getenv('JIRA_DOMAIN')
 JIRA_PROJECT_KEY = os.getenv('JIRA_PROJECT_KEY')
 
 ## Flow config
-JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE: bool = (os.getenv('JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE', '').lower()
+FALLBACK: str = ''
+JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE: bool = (os.getenv('JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE', FALLBACK).lower()
                                            in ('true', '1', 'yes'))
-JIRA_SHOULD_CHECK_LINKED_DEPENDENCY: bool = (os.getenv('JIRA_SHOULD_CHECK_LINKED_DEPENDENCY', '').lower()
+JIRA_SHOULD_CHECK_LINKED_DEPENDENCY: bool = (os.getenv('JIRA_SHOULD_CHECK_LINKED_DEPENDENCY', FALLBACK).lower()
                                              in ('true', '1', 'yes'))
-JIRA_SHOULD_CHECK_GITHUB: bool = (os.getenv('JIRA_SHOULD_CHECK_GITHUB', '').lower() in ('true', '1', 'yes'))
+JIRA_SHOULD_CHECK_GITHUB: bool = (os.getenv('JIRA_SHOULD_CHECK_GITHUB', FALLBACK).lower() in ('true', '1', 'yes'))
 LOGGER_LEVEL = logging.getLevelNamesMapping()[os.getenv('LOGGER_LEVEL', 'INFO').upper()]
 
 #### Export ####
