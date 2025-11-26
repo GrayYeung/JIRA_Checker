@@ -1,5 +1,6 @@
 import logging
-from typing import Any
+from dataclasses import is_dataclass, asdict
+from typing import Any, Mapping
 
 import requests
 
@@ -61,13 +62,35 @@ class JiraClient:
         response.raise_for_status()
         return TransitionsResponse.from_dict(response.json())
 
-    def do_transition(self, ticket_key: str, transition_id: str) -> None:
+    def do_transition(
+            self,
+            ticket_key: str,
+            transition_id: str,
+            additional_fields: Mapping[str, Any] | object | None = None
+    ) -> None:
         url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_key}/transitions"
+
+        fields_dict: dict[str, Any] = {}
+        if additional_fields:
+            if isinstance(additional_fields, Mapping):
+                fields_dict = dict(additional_fields)
+            elif is_dataclass(additional_fields):
+                fields_dict = asdict(additional_fields)
+            else:
+                try:
+                    fields_dict = {
+                        k: v for k, v in vars(additional_fields).items()
+                        if not k.startswith('_')
+                    }
+                except TypeError as e:
+                    raise TypeError("additional_fields must be a mapping, dataclass, or object with attributes") from e
+
         payload = {
-            "transition": {
-                "id": transition_id
-            }
+            "transition": {"id": transition_id}
         }
+        if fields_dict:
+            payload.update(fields_dict)
+
         response = requests.post(url, headers=self.__create_header(), json=payload)
         response.raise_for_status()
 
