@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import Any
 
 import requests
 
@@ -190,6 +191,7 @@ def find_target_transition_id(transitions: list[Transition], target_state: str) 
     return None
 
 
+## TODO: extract out
 def perform_transition(ticket_key: str, target_state: str) -> None:
     response: TransitionsResponse = jira_client.fetch_transitions(ticket_key)
     available_transitions = response.transitions
@@ -200,9 +202,35 @@ def perform_transition(ticket_key: str, target_state: str) -> None:
         logging.error(error_msg)
         raise UnexpectedException(error_msg)
 
+    additional_fields_dict: dict[str, Any] = {}
+    if target_state == "Rework":
+        ## To "Rework", the reason is mandatory
+        reopen_or_rework_reason_field_id = "customfield_13259"
+        code_review_feedback_id = "14403"
+
+        additional_fields = {
+            "fields": {
+                reopen_or_rework_reason_field_id: [
+                    {
+                        "id": code_review_feedback_id
+                    }
+                ]
+            }
+        }
+        additional_fields_dict.update(additional_fields)
+
     ## Perform the transition
-    jira_client.do_transition(ticket_key, target_transition_id)
-    logging.info(f"[{ticket_key}] Transited to '{target_state}'")
+    try:
+        jira_client.do_transition(
+            ticket_key,
+            target_transition_id,
+            additional_fields_dict if additional_fields_dict else None
+        )
+    except requests.exceptions.RequestException:
+        ## some issue type did not contain the additional fields
+        jira_client.do_transition(ticket_key, target_transition_id)
+
+    logging.info(f"[{ticket_key}] Transited to '{target_state}' ({target_transition_id})")
     return
 
 
