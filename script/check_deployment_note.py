@@ -1,6 +1,5 @@
 import logging
 import re
-from typing import Any
 
 import requests
 
@@ -8,7 +7,7 @@ from environment import *
 from exception.exceptionmodel import UnexpectedException
 from jira import *
 from jira.jiramodel import *
-from .utils import print_conclusion, should_skip_by_label, extract_assignee_id
+from .utils import print_conclusion, should_skip_by_label, extract_assignee_id, perform_transition
 
 ##
 whitelisted_label = "SuppressScanning"
@@ -180,58 +179,6 @@ def do_transition(ticket_key: str) -> None:
     except UnexpectedException:
         ## e.g.: for incident type
         perform_transition_for_special_workflow(ticket_key)
-
-
-def find_target_transition_id(transitions: list[Transition], target_state: str) -> str | None:
-    for transition in transitions:
-        if transition.to:
-            if transition.to.name == target_state:
-                return transition.id
-
-    return None
-
-
-## TODO: extract out
-def perform_transition(ticket_key: str, target_state: str) -> None:
-    response: TransitionsResponse = jira_client.fetch_transitions(ticket_key)
-    available_transitions = response.transitions
-    target_transition_id = find_target_transition_id(available_transitions, target_state)
-
-    if not target_transition_id:
-        error_msg = f"[{ticket_key}] Target state '{target_state}' not found"
-        logging.error(error_msg)
-        raise UnexpectedException(error_msg)
-
-    additional_fields_dict: dict[str, Any] = {}
-    if target_state == "Rework":
-        ## To "Rework", the reason is mandatory
-        reopen_or_rework_reason_field_id = "customfield_13259"
-        code_review_feedback_id = "14403"
-
-        additional_fields = {
-            "fields": {
-                reopen_or_rework_reason_field_id: [
-                    {
-                        "id": code_review_feedback_id
-                    }
-                ]
-            }
-        }
-        additional_fields_dict.update(additional_fields)
-
-    ## Perform the transition
-    try:
-        jira_client.do_transition(
-            ticket_key,
-            target_transition_id,
-            additional_fields_dict if additional_fields_dict else None
-        )
-    except requests.exceptions.RequestException:
-        ## some issue type did not contain the additional fields
-        jira_client.do_transition(ticket_key, target_transition_id)
-
-    logging.info(f"[{ticket_key}] Transited to '{target_state}' ({target_transition_id})")
-    return
 
 
 def perform_transition_for_special_workflow(ticket_key: str) -> None:
