@@ -66,7 +66,9 @@ def check_for_deployment_note() -> bool:
 
 def fetch_tickets() -> list[Issue]:
     ## get the last week updated tickets with DeploymentNote label
-    status_list = ['"DONE (Development)"', 'Accepted']
+    ### Done: Story, Debt
+    ### Accepted: Incident, Bugs
+    status_list = ['Done', 'Accepted']
     time_range = "5d"  # e.g.: h,d,w
     project = JIRA_PROJECT_KEY
 
@@ -168,28 +170,13 @@ def is_match_with_issue(candidate: str, ticket: Issue) -> bool:
 ## TODO: move to util
 def do_transition(ticket_key: str) -> None:
     """
-    Perform the transition to "Rework" state for a given ticket.
-    :param ticket_key: Ticket in "DONE (Development)" status; Assume "Accepted" status cannot do transition
+    Perform the transition to "Reopen" state for a given ticket.
+    :param ticket_key: Ticket in "Done" / "Accepted" status
     """
 
-    try:
-        ## Perform the transition once
-        target_state = "Rework"
-        perform_transition(ticket_key, target_state)
-    except UnexpectedException:
-        ## e.g.: for incident type
-        perform_transition_for_special_workflow(ticket_key)
-
-
-def perform_transition_for_special_workflow(ticket_key: str) -> None:
-    transition_states = [
-        "Ready (for Testing)",
-        "Testing In Progress",
-        "Rework"
-    ]
-
-    for state in transition_states:
-        perform_transition(ticket_key, state)
+    ## Perform the transition once
+    target_state = "Reopen (CAT)"
+    perform_transition(ticket_key, target_state)
 
 
 def add_comment(ticket: Issue) -> None:
