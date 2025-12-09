@@ -7,8 +7,7 @@ from exception.exceptionmodel import UnexpectedException
 from jira import *
 from jira.dev_summary_panel_model import *
 from jira.jiramodel import *
-from .check_deployment_note import do_transition
-from .utils import print_conclusion, should_skip_by_label, extract_assignee_id
+from .utils import print_conclusion, should_skip_by_label, extract_assignee_id, perform_transition
 
 ##
 reviewer_field = "customfield_11696"  # This is the field ID for the Reviewer field in JIRA
@@ -58,8 +57,8 @@ def check_for_github() -> bool:
 
             logging.info(f"[{ticket_key}] Found {len(open_prs)} open pull requests ❌")
             ## Action
-            add_comment(ticket, open_prs)
             do_transition(ticket_key)
+            add_comment(ticket, open_prs)
 
             bad_tickets.append(ticket_key)
 
@@ -76,7 +75,9 @@ def check_for_github() -> bool:
 
 def fetch_tickets() -> list[Issue]:
     ## get the last week updated tickets
-    status_list = ['"DONE (Development)"', 'Accepted']
+    ### Done: Story, Debt
+    ### Accepted: Incident, Bugs
+    status_list = ['Done', 'Accepted']
     time_range = "5d"  # e.g.: h,d,w
     time_buffer = "1d"  # e.g.: h,d,w; for cache buffer on info
     project = JIRA_PROJECT_KEY
@@ -309,3 +310,14 @@ def extract_reviewer_id(ticket: Issue) -> Optional[str]:
         reviewer = UserAccount.from_dict(reviewer_data)
         return reviewer.account_id
     return None
+
+
+def do_transition(ticket_key: str) -> None:
+    """
+    Perform the transition to "Reopen" state for a given ticket.
+    :param ticket_key: Ticket in "Done" / "Accepted" status
+    """
+
+    ## Perform the transition once
+    target_state = "Reopen (CAT)"
+    perform_transition(ticket_key, target_state)
