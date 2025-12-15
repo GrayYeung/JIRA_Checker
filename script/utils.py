@@ -55,11 +55,23 @@ def perform_transition(ticket_key: str, target_state: str) -> None:
         raise UnexpectedException(error_msg)
 
     additional_fields_dict: dict[str, Any] = {}
-    if target_state == "Rework" or target_state == "Reopen (CAT)":
-        ## To "Rework" / "Reopen", the reason is mandatory
-        reopen_or_rework_reason_field_id = "customfield_13259"
-        code_review_feedback_id = "14403"
 
+    ## To "Rework" / "Reopen", the reason is mandatory
+    reopen_or_rework_reason_field_id = "customfield_13259"
+    code_review_feedback_id = "14403"
+    if target_state == "Rework":
+        set_fields = {
+            "fields": {
+                reopen_or_rework_reason_field_id: [
+                    {
+                        "id": code_review_feedback_id
+                    }
+                ]
+            }
+        }
+        additional_fields_dict.update(set_fields)
+
+    if target_state == "Reopen (CAT)":
         set_fields = {
             "fields": {
                 reopen_or_rework_reason_field_id: [
@@ -71,7 +83,6 @@ def perform_transition(ticket_key: str, target_state: str) -> None:
         }
 
         ### Explicitly patch since transition not support that field update in one go
-        # additional_fields_dict.update(set_fields)
         jira_client.update_ticket_fields(ticket_key, set_fields)
         logging.info(f"[{ticket_key}] Patched ticket with Reopen/Rework reason field")
 

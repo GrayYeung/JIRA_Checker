@@ -73,7 +73,7 @@ def fetch_tickets() -> list[Issue]:
     project = JIRA_PROJECT_KEY
 
     jql = f'updated >= -{time_range} and labels IN (DeploymentNote) and status IN ({", ".join(status_list)}) and project = {project}'
-    fields = ["assignee", "status", "fixVersions"]
+    fields = ["assignee", "status", "labels", "fixVersions"]
 
     params = SearchTicketsParams(
         jql=jql,
