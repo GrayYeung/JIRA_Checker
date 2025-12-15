@@ -55,6 +55,11 @@ class JiraClient:
             logging.error(f"Error fetching Confluence content for page {page_id}: {e}")
             return None
 
+    def update_ticket_fields(self, ticket_key: str, payload: dict) -> None:
+        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_key}"
+        response = requests.put(url, headers=self.__create_header(), json=payload)
+        response.raise_for_status()
+
     def fetch_transitions(self, ticket_key: str) -> TransitionsResponse:
         """Fetch available transitions for a ticket, type-safe."""
         url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_key}/transitions"
