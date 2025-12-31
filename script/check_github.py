@@ -7,7 +7,8 @@ from exception.exceptionmodel import UnexpectedException
 from jira import *
 from jira.dev_summary_panel_model import *
 from jira.jiramodel import *
-from .utils import print_conclusion, should_skip_by_label, extract_assignee_id, perform_transition
+from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailing_next_part, extract_assignee_id, \
+    perform_transition
 
 ##
 reviewer_field = "customfield_11696"  # This is the field ID for the Reviewer field in JIRA
@@ -55,6 +56,10 @@ def check_for_github() -> bool:
                 logging.info(f"[{ticket_key}] No open Pull Request found. All good ✅")
                 continue
 
+            if should_skip_by_tailing_next_part(ticket):
+                logging.info(f"[{ticket_key}] Skipping due to tailing 'Part N' cloned ticket...")
+                continue
+
             logging.info(f"[{ticket_key}] Found {len(open_prs)} open pull requests ❌")
             ## Action
             do_transition(ticket_key)
@@ -83,7 +88,7 @@ def fetch_tickets() -> list[Issue]:
     project = JIRA_PROJECT_KEY
 
     jql = f'updated >= -{time_range} and updated < -{time_buffer} and status IN ({", ".join(status_list)}) and project = {project}'
-    fields = ["assignee", "status", "labels", reviewer_field]
+    fields = ["assignee", "status", "labels", "issuelinks", reviewer_field]
 
     params = SearchTicketsParams(
         jql=jql,

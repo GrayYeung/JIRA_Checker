@@ -5,7 +5,7 @@ import requests
 from environment import *
 from jira import *
 from jira.jiramodel import *
-from .utils import print_conclusion, should_skip_by_label, extract_reporter_id
+from .utils import print_conclusion, should_skip_by_label, extract_reporter_id, extract_issuelinks
 
 ##
 sprint_field = "customfield_10122"  # This is the field ID for the Sprint field in JIRA
@@ -119,16 +119,6 @@ def extract_sprints(ticket: Issue) -> list[Sprint]:
     sprints = getattr(ticket.fields, sprint_field, None)
     if sprints and isinstance(sprints, list):
         return [Sprint.from_dict(sprint) for sprint in sprints if isinstance(sprint, dict)]
-    return []
-
-
-def extract_issuelinks(ticket: Issue) -> list[IssueLink]:
-    """
-    Expect this parsing will be used in this script only
-    """
-    issue_links = getattr(ticket.fields, "issuelinks", None)
-    if issue_links and isinstance(issue_links, list):
-        return [IssueLink.from_dict(link) for link in issue_links if isinstance(link, dict)]
     return []
 
 
