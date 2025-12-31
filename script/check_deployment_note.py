@@ -351,6 +351,29 @@ def add_comment(ticket: Issue) -> None:
                                 ]
                             }
                         ]
+                    },
+                    {
+                        "type": "listItem",
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "Or, if you want to suppress this type of scanning on this ticket, add this label: "
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": f"{whitelisted_label}",
+                                        "marks": [
+                                            {
+                                                "type": "code"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             }
