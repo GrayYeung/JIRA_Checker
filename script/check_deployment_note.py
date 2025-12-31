@@ -7,7 +7,8 @@ from environment import *
 from exception.exceptionmodel import UnexpectedException
 from jira import *
 from jira.jiramodel import *
-from .utils import print_conclusion, should_skip_by_label, extract_assignee_id, perform_transition
+from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailing_next_part, extract_assignee_id, \
+    perform_transition
 
 ##
 whitelisted_label = "SuppressScanning"
@@ -44,6 +45,10 @@ def check_for_deployment_note() -> bool:
                 logging.info(f"[{ticket_key}] Skipping due to whitelisted label...")
                 continue
 
+            if should_skip_by_tailing_next_part(ticket):
+                logging.info(f"[{ticket_key}] Skipping due to tailing 'Part N' cloned ticket...")
+                continue
+
             remote_links_response: list[RemoteLink] = jira_client.fetch_remote_link(ticket_key)
 
             if not is_valid(remote_links_response, ticket):
@@ -73,7 +78,7 @@ def fetch_tickets() -> list[Issue]:
     project = JIRA_PROJECT_KEY
 
     jql = f'updated >= -{time_range} and labels IN (DeploymentNote) and status IN ({", ".join(status_list)}) and project = {project}'
-    fields = ["assignee", "status", "labels", "fixVersions"]
+    fields = ["assignee", "status", "labels", "issuelinks", "fixVersions"]
 
     params = SearchTicketsParams(
         jql=jql,

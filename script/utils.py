@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Any
 
 import requests
@@ -17,6 +18,31 @@ def should_skip_by_label(ticket: Issue, whitelisted_label: str) -> bool:
             return True
 
     return False
+
+
+def should_skip_by_tailing_next_part(ticket: Issue) -> bool:
+    issue_links = extract_issuelinks(ticket)
+    for link in issue_links:
+        if link.type.inward == "is cloned by":
+            inward_issue = getattr(link, "inward_issue", None)
+            if not inward_issue:
+                continue
+
+            cloned_ticket_summary = inward_issue.fields.get("summary", "")
+
+            ## part N or Part N
+            regex_pattern = r".*\b[Pp][Aa][Rr][Tt]\s*\d+.*$"
+            if re.match(regex_pattern, cloned_ticket_summary):
+                return True
+
+    return False
+
+
+def extract_issuelinks(ticket: Issue) -> list[IssueLink]:
+    issue_links = getattr(ticket.fields, "issuelinks", None)
+    if issue_links and isinstance(issue_links, list):
+        return [IssueLink.from_dict(link) for link in issue_links if isinstance(link, dict)]
+    return []
 
 
 def extract_assignee_id(ticket: Issue) -> Optional[str]:
