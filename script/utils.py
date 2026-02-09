@@ -35,6 +35,10 @@ def should_skip_by_tailing_next_part(ticket: Issue) -> bool:
             if re.match(regex_pattern, cloned_ticket_summary):
                 return True
 
+            ## CLONE - ${original_summary}
+            if "CLONE" in cloned_ticket_summary:
+                return True
+
     return False
 
 
