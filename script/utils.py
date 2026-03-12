@@ -42,6 +42,35 @@ def should_skip_by_tailing_next_part(ticket: Issue) -> bool:
     return False
 
 
+def find_heading_ticket(ticket: Issue) -> Optional[str]:
+    """
+    Find the key of the heading ticket.
+    """
+
+    ## The current ticket should name as "tailing"
+    summary = getattr(ticket.fields, "summary")
+
+    ## part N or Part N
+    ## CLONE - ${original_summary}
+    regex_pattern = r".*\b[Pp][Aa][Rr][Tt]\s*\d+.*$"
+    is_tailing = re.match(regex_pattern, summary) or "CLONE" in summary
+    if not is_tailing:
+        logging.info(f"[{ticket.key}] Not indicate as tailing ticket. Skipping heading ticket search.")
+        return None
+
+    issue_links = extract_issuelinks(ticket)
+    for link in issue_links:
+        if link.type.outward == "clones":
+            outward_issue = getattr(link, "outward_issue", None)
+            if not outward_issue:
+                continue
+
+            heading_key = getattr(outward_issue, "key", None)
+            return heading_key
+
+    return None
+
+
 def extract_issuelinks(ticket: Issue) -> list[IssueLink]:
     issue_links = getattr(ticket.fields, "issuelinks", None)
     if issue_links and isinstance(issue_links, list):
