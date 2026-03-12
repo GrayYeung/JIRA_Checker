@@ -8,7 +8,7 @@ from jira import *
 from jira.dev_summary_panel_model import *
 from jira.jiramodel import *
 from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailing_next_part, extract_assignee_id, \
-    perform_transition
+    perform_transition, find_heading_ticket
 
 ##
 reviewer_field = "customfield_11696"  # This is the field ID for the Reviewer field in JIRA
@@ -44,14 +44,7 @@ def check_for_github() -> bool:
                 logging.info(f"[{ticket_key}] Skipping due to whitelisted label...")
                 continue
 
-            resp = jira_client.get_dev_summary_panel_one_click_urls(issue_id)
-
-            github_instance = extract_github_instance(resp)
-            if not github_instance:
-                logging.info(f"[{ticket_key}] Skipping due to no GitHub trace found...")
-                continue
-
-            open_prs = extract_open_prs(github_instance)
+            open_prs = nest_check_open_prs(ticket)
             if not open_prs:
                 logging.info(f"[{ticket_key}] No open Pull Request found. All good ✅")
                 continue
@@ -88,7 +81,7 @@ def fetch_tickets() -> list[Issue]:
     project = JIRA_PROJECT_KEY
 
     jql = f'updated >= -{time_range} and updated < -{time_buffer} and status IN ({", ".join(status_list)}) and project = {project}'
-    fields = ["assignee", "status", "labels", "issuelinks", reviewer_field]
+    fields = ["assignee", "status", "labels", "issuelinks", "summary", reviewer_field]
 
     params = SearchTicketsParams(
         jql=jql,
@@ -99,6 +92,30 @@ def fetch_tickets() -> list[Issue]:
     response: SearchTicketsResponse = jira_client.fetch_search(params)
 
     return response.issues
+
+
+def nest_check_open_prs(ticket: Issue) -> list[PullRequest]:
+    ticket_key = ticket.key
+    issue_id = ticket.id
+
+    ## check heading ticket
+    heading_key = find_heading_ticket(ticket)
+    if heading_key:
+        logging.info(f"[{ticket_key}] Tracing for its heading ticket ({heading_key})...")
+        heading_ticket = jira_client.fetch_issue(heading_key)
+        heading_result = nest_check_open_prs(heading_ticket)
+        if heading_result:
+            return heading_result
+
+    ## check this ticket
+    resp = jira_client.get_dev_summary_panel_one_click_urls(issue_id)
+
+    github_instance = extract_github_instance(resp)
+    if not github_instance:
+        logging.info(f"[{ticket_key}] Skipping due to no GitHub trace found...")
+        return []
+
+    return extract_open_prs(github_instance)
 
 
 def extract_github_instance(resp: DevSummaryPanelResponse) -> Optional[InstanceType]:
@@ -202,7 +219,7 @@ def add_comment(ticket: Issue, open_prs: list[PullRequest]):
                     },
                     {
                         "type": "text",
-                        "text": " on this Done ticket:"
+                        "text": " on this Done ticket or its heading clone:"
                     }
                 ]
             },
