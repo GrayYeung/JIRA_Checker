@@ -49,6 +49,8 @@ def check_for_deployment_note() -> bool:
                 logging.info(f"[{ticket_key}] Skipping due to tailing 'Part N' cloned ticket...")
                 continue
 
+            ## No need to tracking on heading, because assume the labels at JIRA will be inherited when cloning
+
             remote_links_response: list[RemoteLink] = jira_client.fetch_remote_link(ticket_key)
 
             if not is_valid(remote_links_response, ticket):

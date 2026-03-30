@@ -44,13 +44,13 @@ def check_for_github() -> bool:
                 logging.info(f"[{ticket_key}] Skipping due to whitelisted label...")
                 continue
 
+            if should_skip_by_tailing_next_part(ticket):
+                logging.info(f"[{ticket_key}] Skipping due to tailing 'Part N' cloned ticket...")
+                continue
+
             open_prs = nest_check_open_prs(ticket)
             if not open_prs:
                 logging.info(f"[{ticket_key}] No open Pull Request found. All good ✅")
-                continue
-
-            if should_skip_by_tailing_next_part(ticket):
-                logging.info(f"[{ticket_key}] Skipping due to tailing 'Part N' cloned ticket...")
                 continue
 
             logging.info(f"[{ticket_key}] Found {len(open_prs)} open pull requests ❌")
