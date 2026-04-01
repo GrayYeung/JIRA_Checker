@@ -165,7 +165,7 @@ def add_comment(ticket: Issue, open_prs: list[PullRequest]):
                 "content": [
                     {
                         "type": "text",
-                        "text": f"{user} (bot):",
+                        "text": f"{user} (bot 🤖):",
                         "marks": [
                             {
                                 "type": "strong"

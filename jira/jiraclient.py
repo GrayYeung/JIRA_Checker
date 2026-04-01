@@ -1,6 +1,6 @@
 import logging
 from dataclasses import is_dataclass, asdict
-from typing import Any, Mapping
+from typing import Mapping, cast
 
 import requests
 
@@ -80,7 +80,7 @@ class JiraClient:
             if isinstance(additional_fields, Mapping):
                 fields_dict = dict(additional_fields)
             elif is_dataclass(additional_fields):
-                fields_dict = asdict(additional_fields)
+                fields_dict = asdict(cast(Any, additional_fields))
             else:
                 try:
                     fields_dict = {
@@ -99,7 +99,13 @@ class JiraClient:
         response = requests.post(url, headers=self.__create_header(), json=payload)
         response.raise_for_status()
 
-    def add_comment(self, ticket_key: str, comment: dict) -> None:
+    def fetch_comments(self, ticket_key: str) -> CommentsResponse:
+        url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_key}/comment"
+        response = requests.get(url, headers=self.__create_header())
+        response.raise_for_status()
+        return CommentsResponse.from_dict(response.json())
+
+    def add_comment(self, ticket_key: str, comment: dict[str, Any]) -> None:
         url = f"https://{self.jira_domain}/rest/api/3/issue/{ticket_key}/comment"
         payload = {
             "body": comment,
