@@ -12,6 +12,7 @@ from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailin
 
 ##
 whitelisted_label = "SuppressScanning"
+warning_label = "DeploymentNote"
 
 
 ####
@@ -55,7 +56,9 @@ def check_for_deployment_note() -> bool:
 
             if not is_valid(remote_links_response, ticket):
                 ## Action
-                do_transition(ticket_key)
+                if should_do_transition(ticket_key):
+                    do_transition(ticket_key)
+
                 add_comment(ticket)
 
                 bad_tickets.append(ticket_key)
@@ -390,3 +393,49 @@ def add_comment(ticket: Issue) -> None:
     jira_client.add_comment(ticket_key, comment)
     logging.info(f"[{ticket_key}] Added comment")
     return
+
+
+def should_do_transition(ticket_key: str) -> bool:
+    included_week_day = [0, 1, 2, 3, 4]  ## Monday to Friday
+    quota = 3  ## Allow time for action for 3 comments
+
+    comments_resp = jira_client.fetch_comments(ticket_key)
+    comments_resp_comments: List[JiraComment] = comments_resp.comments
+
+    valid_warning_comments: List[JiraComment] = [
+        comment
+        for comment in comments_resp_comments
+        if comment.created
+           and comment.created.weekday() in included_week_day
+           and is_warning_comment(comment)
+    ]
+
+    if len(valid_warning_comments) >= quota:
+        return True
+
+    logging.info(f"[{ticket_key}] Skipped transition due to available quota...")
+    return False
+
+
+def is_warning_comment(comment: JiraComment) -> bool:
+    body: JiraCommentBody = comment.body
+    contents: List[JiraCommentNode] = body.content
+    for content in contents:
+        texts = flatten_for_text(content)
+        for text in texts:
+            if text == warning_label:
+                return True
+
+    return False
+
+
+def flatten_for_text(jira_comment_node: JiraCommentNode) -> List[str]:
+    if jira_comment_node.type == "text":
+        return [jira_comment_node.text]
+    elif jira_comment_node.content:
+        result = []
+        for child in jira_comment_node.content:
+            result.extend(flatten_for_text(child))
+        return result
+    else:
+        return []
