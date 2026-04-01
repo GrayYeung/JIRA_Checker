@@ -205,7 +205,7 @@ def add_comment(ticket: Issue) -> None:
                 "content": [
                     {
                         "type": "text",
-                        "text": f"{user} (bot):",
+                        "text": f"{user} (bot 🤖):",
                         "marks": [
                             {
                                 "type": "strong"
@@ -234,7 +234,7 @@ def add_comment(ticket: Issue) -> None:
                 "content": [
                     {
                         "type": "text",
-                        "text": "This issue is reopened because it is labelled with "
+                        "text": "This issue is highlighted or reopened because it is labelled with "
                     },
                     {
                         "type": "text",
@@ -323,7 +323,7 @@ def add_comment(ticket: Issue) -> None:
                                 "content": [
                                     {
                                         "type": "text",
-                                        "text": "Prepare the Deployment Note;"
+                                        "text": "Prepare the Deployment Note (Environment Variable Change, Flyway, or Manual Script etc.);"
                                     }
                                 ]
                             }
