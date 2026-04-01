@@ -1,6 +1,24 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
+
+
+#### utils ####
+def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+
+    normalized_value = value.replace('Z', '+00:00')
+    try:
+        return datetime.fromisoformat(normalized_value)
+    except ValueError:
+        for fmt in ('%Y-%m-%dT%H:%M:%S.%f%z', '%Y-%m-%dT%H:%M:%S%z', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(normalized_value, fmt)
+            except ValueError:
+                continue
+
+    raise ValueError(f'Unsupported datetime format: {value}')
 
 
 #### Type ####
@@ -312,6 +330,113 @@ class TransitionsResponse:
         return cls(
             expand=data.get('expand', ''),
             transitions=transitions
+        )
+
+
+@dataclass
+class CommentVisibility:
+    type: str = ''
+    value: str = ''
+    identifier: str = ''
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        return cls(
+            type=data.get('type', ''),
+            value=data.get('value', ''),
+            identifier=data.get('identifier', '')
+        )
+
+
+@dataclass
+class JiraCommentMark:
+    type: str = ''
+    attrs: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'JiraCommentMark':
+        return cls(
+            type=data.get('type', ''),
+            attrs=data.get('attrs', {})
+        )
+
+
+@dataclass
+class JiraCommentNode:
+    type: str = ''
+    content: List['JiraCommentNode'] = field(default_factory=list)
+    text: Optional[str] = None
+    marks: List[JiraCommentMark] = field(default_factory=list)
+    attrs: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'JiraCommentNode':
+        return cls(
+            type=data.get('type', ''),
+            content=[cls.from_dict(item) for item in data.get('content', [])],
+            text=data.get('text'),
+            marks=[JiraCommentMark.from_dict(mark) for mark in data.get('marks', [])],
+            attrs=data.get('attrs', {})
+        )
+
+
+@dataclass
+class JiraCommentBody:
+    type: str = ''
+    content: List[JiraCommentNode] = field(default_factory=list)
+    version: Optional[int] = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'JiraCommentBody':
+        return cls(
+            type=data.get('type', ''),
+            content=[JiraCommentNode.from_dict(item) for item in data.get('content', [])],
+            version=data.get('version')
+        )
+
+
+@dataclass
+class JiraComment:
+    id: str = ''
+    self_url: str = ''
+    author: Optional[UserAccount] = None
+    body: JiraCommentBody = field(default_factory=JiraCommentBody)
+    update_author: Optional[UserAccount] = None
+    created: Optional[datetime] = None
+    updated: Optional[datetime] = None
+    jsd_public: bool = False
+    visibility: Optional[CommentVisibility] = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'JiraComment':
+        return cls(
+            id=data.get('id', ''),
+            self_url=data.get('self', ''),
+            author=UserAccount.from_dict(data['author']) if data.get('author') else None,
+            body=JiraCommentBody.from_dict(data.get('body', {})),
+            update_author=UserAccount.from_dict(data['updateAuthor']) if data.get('updateAuthor') else None,
+            created=_parse_datetime(data.get('created')),
+            updated=_parse_datetime(data.get('updated')),
+            jsd_public=data.get('jsdPublic', False),
+            visibility=CommentVisibility.from_dict(data['visibility']) if data.get('visibility') else None
+        )
+
+
+@dataclass
+class CommentsResponse:
+    start_at: int = 0
+    max_results: int = 0
+    total: int = 0
+    comments: List[JiraComment] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'CommentsResponse':
+        comments = [JiraComment.from_dict(comment_data) for comment_data in data.get('comments', [])]
+        return cls(
+            start_at=data.get('startAt', 0),
+            max_results=data.get('maxResults', 0),
+            total=data.get('total', 0),
+            comments=comments
         )
 
 
