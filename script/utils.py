@@ -1,6 +1,5 @@
 import logging
 import re
-from typing import Any
 
 import requests
 
@@ -31,12 +30,21 @@ def should_skip_by_tailing_next_part(ticket: Issue) -> bool:
             cloned_ticket_summary = inward_issue.fields.get("summary", "")
 
             ## part N or Part N
-            regex_pattern = r".*\b[Pp][Aa][Rr][Tt]\s*\d+.*$"
-            if re.match(regex_pattern, cloned_ticket_summary):
+            regex_pattern = r".*\bPart\s*\d+.*$"
+            if re.match(regex_pattern, cloned_ticket_summary, re.IGNORECASE):
                 return True
 
             ## CLONE - ${original_summary}
             if "CLONE" in cloned_ticket_summary:
+                return True
+
+            ## custom title
+            clone_from_pattern = r"cloned? from"
+            if re.match(clone_from_pattern, cloned_ticket_summary, re.IGNORECASE):
+                return True
+
+            cloned_pattern = r'\(\s*cloned?\s*\)'
+            if re.match(cloned_pattern, cloned_ticket_summary, re.IGNORECASE):
                 return True
 
     return False
