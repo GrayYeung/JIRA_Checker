@@ -19,6 +19,28 @@ def should_skip_by_label(ticket: Issue, whitelisted_label: str) -> bool:
     return False
 
 
+def is_custom_clone_summary(summary: str) -> bool:
+    ## part N or Part N
+    regex_pattern = r".*\bPart\s*\d+.*$"
+    if re.match(regex_pattern, summary, re.IGNORECASE):
+        return True
+
+    ## CLONE - ${original_summary}
+    if "CLONE" in summary:
+        return True
+
+    ## custom title
+    clone_from_pattern = r"cloned? from"
+    if re.search(clone_from_pattern, summary, re.IGNORECASE):
+        return True
+
+    cloned_pattern = r'\(\s*cloned?\s*\)'
+    if re.search(cloned_pattern, summary, re.IGNORECASE):
+        return True
+
+    return False
+
+
 def should_skip_by_tailing_next_part(ticket: Issue) -> bool:
     issue_links = extract_issuelinks(ticket)
     for link in issue_links:
@@ -28,24 +50,7 @@ def should_skip_by_tailing_next_part(ticket: Issue) -> bool:
                 continue
 
             cloned_ticket_summary = inward_issue.fields.get("summary", "")
-
-            ## part N or Part N
-            regex_pattern = r".*\bPart\s*\d+.*$"
-            if re.match(regex_pattern, cloned_ticket_summary, re.IGNORECASE):
-                return True
-
-            ## CLONE - ${original_summary}
-            if "CLONE" in cloned_ticket_summary:
-                return True
-
-            ## custom title
-            clone_from_pattern = r"cloned? from"
-            if re.search(clone_from_pattern, cloned_ticket_summary, re.IGNORECASE):
-                return True
-
-            cloned_pattern = r'\(\s*cloned?\s*\)'
-            if re.search(cloned_pattern, cloned_ticket_summary, re.IGNORECASE):
-                return True
+            return is_custom_clone_summary(cloned_ticket_summary)
 
     return False
 
@@ -55,17 +60,15 @@ def find_heading_ticket(ticket: Issue) -> Optional[str]:
     Find the key of the heading ticket.
     """
 
-    ## The current ticket should name as "tailing"
+    ## Cheap search on summary first
+    ## The current ticket should know as "tailing"
     summary = getattr(ticket.fields, "summary")
-
-    ## part N or Part N
-    ## CLONE - ${original_summary}
-    regex_pattern = r".*\b[Pp][Aa][Rr][Tt]\s*\d+.*$"
-    is_tailing = re.match(regex_pattern, summary) or "CLONE" in summary
+    is_tailing = is_custom_clone_summary(summary)
     if not is_tailing:
         logging.info(f"[{ticket.key}] Not indicate as tailing ticket. Skipping heading ticket search.")
         return None
 
+    ## Expensive search on relation
     issue_links = extract_issuelinks(ticket)
     for link in issue_links:
         if link.type.outward == "clones":
