@@ -48,7 +48,7 @@ def check_for_github() -> bool:
                 logging.info(f"[{ticket_key}] Skipping due to tailing 'Part N' cloned ticket...")
                 continue
 
-            open_prs = nest_check_open_prs(ticket)
+            open_prs = nest_check_open_prs(ticket, None)
             if not open_prs:
                 logging.info(f"[{ticket_key}] No open Pull Request found. All good ✅")
                 continue
@@ -94,16 +94,18 @@ def fetch_tickets() -> list[Issue]:
     return response.issues
 
 
-def nest_check_open_prs(ticket: Issue) -> list[PullRequest]:
+def nest_check_open_prs(ticket: Issue, linked_ticket_key: Optional[str]) -> list[PullRequest]:
     ticket_key = ticket.key
     issue_id = ticket.id
 
     ## check heading ticket
     heading_key = find_heading_ticket(ticket)
     if heading_key:
-        logging.info(f"[{ticket_key}] Tracing for its heading ticket ({heading_key})...")
+        logging.info(
+            f"[{determine_relationship(ticket_key, heading_key)}] Tracing for its heading ticket ({heading_key})..."
+        )
         heading_ticket = jira_client.fetch_issue(heading_key)
-        heading_result = nest_check_open_prs(heading_ticket)
+        heading_result = nest_check_open_prs(heading_ticket, ticket_key)
         if heading_result:
             return heading_result
 
@@ -112,10 +114,21 @@ def nest_check_open_prs(ticket: Issue) -> list[PullRequest]:
 
     github_instance = extract_github_instance(resp)
     if not github_instance:
-        logging.info(f"[{ticket_key}] Skipping due to no GitHub trace found...")
+        logging.info(
+            f"[{determine_relationship(ticket_key, linked_ticket_key)}] Skipping due to no GitHub trace found..."
+        )
         return []
 
-    return extract_open_prs(github_instance)
+    result = extract_open_prs(github_instance)
+    logging.info(f"[{determine_relationship(ticket_key, linked_ticket_key)}] Open PRs: {len(result)}")
+    return result
+
+
+def determine_relationship(ticket_key: str, linked_ticket_key: Optional[str]) -> str:
+    if not linked_ticket_key:
+        return ticket_key
+
+    return f"{ticket_key} -> {linked_ticket_key}"
 
 
 def extract_github_instance(resp: DevSummaryPanelResponse) -> Optional[InstanceType]:
