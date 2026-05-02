@@ -9,6 +9,8 @@ from script import check_for_deployment_note, check_for_linked_dependency, check
 logging.basicConfig(
     level=LOGGER_LEVEL, format="%(asctime)s - %(levelname)s - %(message)s"
 )
+# Force logging timestamps to HKT (UTC+8)
+logging.Formatter.converter = lambda *args: datetime.now(timezone(timedelta(hours=8))).timetuple()
 
 
 ####
