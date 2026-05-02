@@ -5,7 +5,8 @@ import requests
 from environment import *
 from jira import *
 from jira.jiramodel import *
-from .utils import print_conclusion, should_skip_by_label, extract_reporter_id, extract_issuelinks
+from .utils import print_conclusion, should_skip_by_label, find_heading_ticket, extract_reporter_id, \
+    extract_issue_links
 
 ##
 sprint_field = "customfield_10122"  # This is the field ID for the Sprint field in JIRA
@@ -37,12 +38,17 @@ def check_for_linked_dependency():
                 logging.info(f"[{ticket_key}] Skipping due to whitelisted label...")
                 continue
 
+            heading_ticket = find_heading_ticket(ticket)
+            if heading_ticket:
+                logging.info(f"[{ticket_key}] Skipping due to it is a cloned ticket...")
+                continue
+
             ticket_sprints = extract_sprints(ticket)
             if not ticket_sprints:
                 logging.info(f"[{ticket_key}] Skipping due to no sprint...")
                 continue
 
-            linked_issues = extract_issuelinks(ticket)
+            linked_issues = extract_issue_links(ticket)
             if not linked_issues:
                 logging.info(f"[{ticket_key}] Skipping due to no linked issues found...")
                 continue
@@ -99,7 +105,7 @@ def fetch_tickets() -> list[Issue]:
     project = JIRA_PROJECT_KEY
 
     jql = f'updated >= -{time_range} and sprint != empty and issueLinkType IS NOT EMPTY and status IN ({", ".join(status_list)}) and project = {project}'
-    fields = ["assignee", "status", "labels", f"{sprint_field}", "issuelinks"]
+    fields = ["assignee", "status", "labels", f"{sprint_field}", "issuelinks", "summary"]
 
     params = SearchTicketsParams(
         jql=jql,
