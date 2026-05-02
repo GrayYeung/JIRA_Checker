@@ -16,6 +16,7 @@ logging.basicConfig(
 def main():
     hkt = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
     logging.info(f"Starting JIRA checking script at {hkt} (HKT)...")
+    logging.info("=================================================================================")
 
     results = []
 
@@ -23,14 +24,17 @@ def main():
         if JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE:
             result = check_for_deployment_note()
             results.append(result)
+            logging.info("=================================================================================")
 
         if JIRA_SHOULD_CHECK_LINKED_DEPENDENCY:
             result = check_for_linked_dependency()
             results.append(result)
+            logging.info("=================================================================================")
 
         if JIRA_SHOULD_CHECK_GITHUB:
             result = check_for_github()
             results.append(result)
+            logging.info("=================================================================================")
 
         logging.info("Done JIRA checking script!")
     except Exception as e:

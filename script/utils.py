@@ -42,7 +42,7 @@ def is_custom_clone_summary(summary: str) -> bool:
 
 
 def should_skip_by_tailing_next_part(ticket: Issue) -> bool:
-    issue_links = extract_issuelinks(ticket)
+    issue_links = extract_issue_links(ticket)
     for link in issue_links:
         if link.type.inward == "is cloned by":
             inward_issue = getattr(link, "inward_issue", None)
@@ -69,7 +69,7 @@ def find_heading_ticket(ticket: Issue) -> Optional[str]:
         return None
 
     ## Expensive search on relation
-    issue_links = extract_issuelinks(ticket)
+    issue_links = extract_issue_links(ticket)
     for link in issue_links:
         if link.type.outward == "clones":
             outward_issue = getattr(link, "outward_issue", None)
@@ -82,7 +82,7 @@ def find_heading_ticket(ticket: Issue) -> Optional[str]:
     return None
 
 
-def extract_issuelinks(ticket: Issue) -> list[IssueLink]:
+def extract_issue_links(ticket: Issue) -> list[IssueLink]:
     issue_links = getattr(ticket.fields, "issuelinks", None)
     if issue_links and isinstance(issue_links, list):
         return [IssueLink.from_dict(link) for link in issue_links if isinstance(link, dict)]
