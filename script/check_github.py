@@ -323,11 +323,30 @@ def add_comment(ticket: Issue, open_prs: list[PullRequest]):
                                                 "type": "code"
                                             }
                                         ]
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": ";"
+                                    },
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "type": "listItem",
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "Or, setup a cloned ticket for proper follow-up"
                                     }
                                 ]
                             }
                         ]
                     }
+
                 ]
             }
         ]
