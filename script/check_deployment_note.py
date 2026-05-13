@@ -8,7 +8,7 @@ from exception.exceptionmodel import UnexpectedException
 from jira import *
 from jira.jiramodel import *
 from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailing_next_part, extract_assignee_id, \
-    perform_transition
+    perform_one_of_transitions
 
 ##
 whitelisted_label = "SuppressScanning"
@@ -185,8 +185,8 @@ def do_transition(ticket_key: str) -> None:
     """
 
     ## Perform the transition once
-    target_state = "Reopen (CAT)"
-    perform_transition(ticket_key, target_state)
+    target_states = ["Reopen (CAT)", "Rework"]
+    perform_one_of_transitions(ticket_key, target_states)
 
 
 def add_comment(ticket: Issue) -> None:
