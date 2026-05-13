@@ -114,6 +114,22 @@ def print_conclusion(bad_tickets: list[str], error_tickets: list[str]):
                  )
 
 
+def perform_one_of_transitions(ticket_key: str, target_states: list[str]) -> None:
+    for target_state in target_states:
+        try:
+            perform_transition(ticket_key, target_state)
+            return
+        except requests.exceptions.RequestException:
+            is_last = target_state == target_states[-1]
+            if is_last:
+                logging.error(f"[{ticket_key}] Failed to transition to all target states: {target_states}")
+                raise
+            else:
+                logging.warning(
+                    f"[{ticket_key}] Failed to transition to '{target_state}', trying next target state if any...")
+                continue
+
+
 def perform_transition(ticket_key: str, target_state: str) -> None:
     response: TransitionsResponse = jira_client.fetch_transitions(ticket_key)
     available_transitions = response.transitions
