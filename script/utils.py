@@ -82,6 +82,13 @@ def find_heading_ticket(ticket: Issue) -> Optional[str]:
     return None
 
 
+def determine_relationship(ticket_key: str, linked_ticket_key: Optional[str]) -> str:
+    if not linked_ticket_key:
+        return ticket_key
+
+    return f"{ticket_key} -> {linked_ticket_key}"
+
+
 def extract_issue_links(ticket: Issue) -> list[IssueLink]:
     issue_links = getattr(ticket.fields, "issuelinks", None)
     if issue_links and isinstance(issue_links, list):
