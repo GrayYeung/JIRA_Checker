@@ -8,7 +8,7 @@ from jira import *
 from jira.dev_summary_panel_model import *
 from jira.jiramodel import *
 from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailing_next_part, extract_assignee_id, \
-    perform_transition, find_heading_ticket
+    perform_transition, find_heading_ticket, determine_relationship
 
 ##
 reviewer_field = "customfield_11696"  # This is the field ID for the Reviewer field in JIRA
@@ -122,13 +122,6 @@ def nest_check_open_prs(ticket: Issue, linked_ticket_key: Optional[str]) -> list
     result = extract_open_prs(github_instance)
     logging.info(f"[{determine_relationship(ticket_key, linked_ticket_key)}] Open PRs: {len(result)}")
     return result
-
-
-def determine_relationship(ticket_key: str, linked_ticket_key: Optional[str]) -> str:
-    if not linked_ticket_key:
-        return ticket_key
-
-    return f"{ticket_key} -> {linked_ticket_key}"
 
 
 def extract_github_instance(resp: DevSummaryPanelResponse) -> Optional[InstanceType]:

@@ -8,7 +8,7 @@ from exception.exceptionmodel import UnexpectedException
 from jira import *
 from jira.jiramodel import *
 from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailing_next_part, extract_assignee_id, \
-    perform_one_of_transitions
+    perform_one_of_transitions, find_heading_ticket, determine_relationship
 
 ##
 whitelisted_label = "SuppressScanning"
@@ -50,11 +50,7 @@ def check_for_deployment_note() -> bool:
                 logging.info(f"[{ticket_key}] Skipping due to tailing 'Part N' cloned ticket...")
                 continue
 
-            ## No need to tracking on heading, because assume the labels at JIRA will be inherited when cloning
-
-            remote_links_response: list[RemoteLink] = jira_client.fetch_remote_link(ticket_key)
-
-            if not is_valid(remote_links_response, ticket):
+            if not nest_check(ticket, None):
                 ## Action
                 if should_do_transition(ticket_key):
                     do_transition(ticket_key)
@@ -83,7 +79,7 @@ def fetch_tickets() -> list[Issue]:
     project = JIRA_PROJECT_KEY
 
     jql = f'updated >= -{time_range} and labels IN (DeploymentNote) and status IN ({", ".join(status_list)}) and project = {project}'
-    fields = ["assignee", "status", "labels", "issuelinks", "fixVersions"]
+    fields = ["assignee", "status", "labels", "issuelinks", "summary", "fixVersions"]
 
     params = SearchTicketsParams(
         jql=jql,
@@ -94,6 +90,34 @@ def fetch_tickets() -> list[Issue]:
     response: SearchTicketsResponse = jira_client.fetch_search(params)
 
     return response.issues
+
+
+def nest_check(ticket: Issue, linked_ticket_key: Optional[str]) -> bool:
+    """
+    Check the current ticket first, if invalid, find the heading ticket and check recursively until either find valid or no heading ticket found.
+    """
+    ticket_key = ticket.key
+    current_result = check(ticket)
+    if current_result:
+        logging.info(f"[{determine_relationship(ticket_key, linked_ticket_key)}] Carrying result: {current_result}")
+        return current_result
+
+    ## check heading ticket
+    ## Assume the labels at JIRA will be inherited when cloning
+    heading_key = find_heading_ticket(ticket)
+    if heading_key:
+        logging.info(
+            f"[{determine_relationship(ticket_key, heading_key)}] Tracing for its heading ticket ({heading_key})..."
+        )
+        heading_ticket = jira_client.fetch_issue(heading_key)
+        return nest_check(heading_ticket, ticket_key);
+
+    return False
+
+
+def check(ticket: Issue) -> bool:
+    remote_links_response: list[RemoteLink] = jira_client.fetch_remote_link(ticket.key)
+    return is_valid(remote_links_response, ticket)
 
 
 def is_valid(remote_link_resp: list[RemoteLink], ticket: Issue) -> bool:
