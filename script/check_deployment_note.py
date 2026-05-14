@@ -52,10 +52,11 @@ def check_for_deployment_note() -> bool:
 
             if not nest_check(ticket, None):
                 ## Action
-                if should_do_transition(ticket_key):
+                remaining_quota = calculate_remaining_quota(ticket_key)
+                if should_do_transition(remaining_quota):
                     do_transition(ticket_key)
 
-                add_comment(ticket)
+                add_comment(ticket, remaining_quota)
 
                 bad_tickets.append(ticket_key)
                 continue
@@ -112,7 +113,7 @@ def nest_check(ticket: Issue, linked_ticket_key: Optional[str]) -> bool:
             f"[{determine_relationship(ticket_key, heading_key)}] Tracing for its heading ticket ({heading_key})..."
         )
         heading_ticket = jira_client.fetch_issue(heading_key)
-        return nest_check(heading_ticket, ticket_key);
+        return nest_check(heading_ticket, ticket_key)
 
     return False
 
@@ -215,7 +216,7 @@ def do_transition(ticket_key: str) -> None:
     perform_one_of_transitions(ticket_key, target_states)
 
 
-def add_comment(ticket: Issue) -> None:
+def add_comment(ticket: Issue, remaining_quota: int) -> None:
     """
     Add a comment to the ticket to notify about the transition.
     For simplicity, we will use a static comment.
@@ -224,6 +225,8 @@ def add_comment(ticket: Issue) -> None:
     ticket_key = ticket.key
     user = jira_client.fetch_myself().display_name or "JIRA"
     assignee_id = extract_assignee_id(ticket)
+
+    action = f"highlighted (quota before reopened: {remaining_quota})" if remaining_quota > 0 else "reopened"
 
     comment = {
         "version": 1,
@@ -263,7 +266,7 @@ def add_comment(ticket: Issue) -> None:
                 "content": [
                     {
                         "type": "text",
-                        "text": "This issue is highlighted or reopened because it is labelled with "
+                        "text": f"This issue is {action} because it is labelled with "
                     },
                     {
                         "type": "text",
@@ -421,7 +424,15 @@ def add_comment(ticket: Issue) -> None:
     return
 
 
-def should_do_transition(ticket_key: str) -> bool:
+def should_do_transition(ticket_key: str, remaining_quota: int) -> bool:
+    if remaining_quota == 0:
+        return True
+
+    logging.info(f"[{ticket_key}] Skipped transition due to available quota...")
+    return False
+
+
+def calculate_remaining_quota(ticket_key: str) -> int:
     included_week_day = [0, 1, 2, 3, 4]  ## Monday to Friday
     quota = 3  ## Allow time for action for 3 comments
 
@@ -436,11 +447,7 @@ def should_do_transition(ticket_key: str) -> bool:
            and is_warning_comment(comment)
     ]
 
-    if len(valid_warning_comments) >= quota:
-        return True
-
-    logging.info(f"[{ticket_key}] Skipped transition due to available quota...")
-    return False
+    return max(quota - len(valid_warning_comments), 0)
 
 
 def is_warning_comment(comment: JiraComment) -> bool:
@@ -457,7 +464,7 @@ def is_warning_comment(comment: JiraComment) -> bool:
 
 def flatten_for_text(jira_comment_node: JiraCommentNode) -> List[str]:
     if jira_comment_node.type == "text":
-        return [jira_comment_node.text]
+        return [jira_comment_node.text] if jira_comment_node.text is not None else []
     elif jira_comment_node.content:
         result = []
         for child in jira_comment_node.content:
