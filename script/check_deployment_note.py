@@ -99,7 +99,9 @@ def nest_check(ticket: Issue, linked_ticket_key: Optional[str]) -> bool:
     ticket_key = ticket.key
     current_result = check(ticket)
     if current_result:
-        logging.info(f"[{determine_relationship(ticket_key, linked_ticket_key)}] Carrying result: {current_result}")
+        if linked_ticket_key:
+            ## log only if heading
+            logging.info(f"[{determine_relationship(ticket_key, linked_ticket_key)}] Carrying result: {current_result}")
         return current_result
 
     ## check heading ticket
