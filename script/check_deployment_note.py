@@ -53,7 +53,7 @@ def check_for_deployment_note() -> bool:
             if not nest_check(ticket, None):
                 ## Action
                 remaining_quota = calculate_remaining_quota(ticket_key)
-                if should_do_transition(remaining_quota):
+                if should_do_transition(ticket_key, remaining_quota):
                     do_transition(ticket_key)
 
                 add_comment(ticket, remaining_quota)
@@ -279,7 +279,7 @@ def add_comment(ticket: Issue, remaining_quota: int) -> None:
                     },
                     {
                         "type": "text",
-                        "text": ", and has transitioned to "
+                        "text": f" ({define_keyword()}), and has transitioned to "
                     },
                     {
                         "type": "text",
@@ -369,7 +369,23 @@ def add_comment(ticket: Issue, remaining_quota: int) -> None:
                                 "content": [
                                     {
                                         "type": "text",
-                                        "text": "Or, if there is, make sure that the Confluence page for Release has "
+                                        "text": "Or, if there is, make sure that the Confluence page for an "
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": "exact match",
+                                        "marks": [
+                                            {
+                                                "type": "em"
+                                            },
+                                            {
+                                                "type": "underline"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": " Release has "
                                     },
                                     {
                                         "type": "text",
@@ -386,6 +402,18 @@ def add_comment(ticket: Issue, remaining_quota: int) -> None:
                                     {
                                         "type": "text",
                                         "text": " mentioned this ticket key"
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": "exact match",
+                                        "marks": [
+                                            {
+                                                "type": "em"
+                                            },
+                                            {
+                                                "type": "underline"
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -420,7 +448,7 @@ def add_comment(ticket: Issue, remaining_quota: int) -> None:
     }
 
     jira_client.add_comment(ticket_key, comment)
-    logging.info(f"[{ticket_key}] Added comment")
+    logging.info(f"[{ticket_key}] Added comment 🟡")
     return
 
 
@@ -428,7 +456,7 @@ def should_do_transition(ticket_key: str, remaining_quota: int) -> bool:
     if remaining_quota == 0:
         return True
 
-    logging.info(f"[{ticket_key}] Skipped transition due to available quota...")
+    logging.info(f"[{ticket_key}] Skipped transition due to available quota ({remaining_quota})...")
     return False
 
 
@@ -456,7 +484,7 @@ def is_warning_comment(comment: JiraComment) -> bool:
     for content in contents:
         texts = flatten_for_text(content)
         for text in texts:
-            if text == warning_label:
+            if define_keyword() in text:
                 return True
 
     return False
@@ -472,3 +500,7 @@ def flatten_for_text(jira_comment_node: JiraCommentNode) -> List[str]:
         return result
     else:
         return []
+
+
+def define_keyword() -> str:
+    return f"label::{warning_label}"

@@ -305,6 +305,6 @@ def add_comment(ticket: Issue, warnings: list[str]) -> None:
     }
 
     jira_client.add_comment(ticket_key, comment)
-    logging.info(f"[{ticket_key}] Added comment")
+    logging.info(f"[{ticket_key}] Added comment 🟡")
 
     return
