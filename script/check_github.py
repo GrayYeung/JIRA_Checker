@@ -1,9 +1,11 @@
 import logging
+import re
 
 import requests
 
 from environment import *
 from exception.exceptionmodel import UnexpectedException
+from github import github_client
 from jira import *
 from jira.dev_summary_panel_model import *
 from jira.jiramodel import *
@@ -145,15 +147,40 @@ def extract_open_prs(github: InstanceType) -> list[PullRequest]:
 
     if github.danglingPullRequests:
         opens = [pr for pr in github.danglingPullRequests if pr.status and pr.status == 'OPEN']
-        result.extend(opens)
+        for open_pr in opens:
+            url = open_pr.url
+            if not check_with_gh(url):
+                result.append(open_pr)
 
     if github.repository:
         for repo in github.repository:
             if repo.pullRequests:
                 opens = [pr for pr in repo.pullRequests if pr.status and pr.status == 'OPEN']
-                result.extend(opens)
+                for open_pr in opens:
+                    url = open_pr.url
+                    if not check_with_gh(url):
+                        result.append(open_pr)
 
     return result
+
+
+def check_with_gh(url: str | None) -> bool:
+    """
+    :return TRUE if the status at gh is closed.
+    """
+    if not url:
+        return False
+
+    ## Example URL: https://github.com/owner/repo/pull/123
+    m = re.match(r"https://github.com/([^/]+)/([^/]+)/pull/(\d+)", url)
+    if not m:
+        return False
+
+    owner, repo, pr_number = m.group(1), m.group(2), m.group(3)
+    pr = github_client.fetch_pr(owner, repo, pr_number)
+
+    ## Consider closed if state is 'closed' or merged_at is not None
+    return pr.state == 'closed' or pr.merged_at is not None
 
 
 def add_comment(ticket: Issue, open_prs: list[PullRequest]):
