@@ -373,7 +373,7 @@ def add_comment(ticket: Issue, open_prs: list[PullRequest]):
     }
 
     jira_client.add_comment(ticket_key, comment)
-    logging.info(f"[{ticket_key}] Added comment")
+    logging.info(f"[{ticket_key}] Added comment 🟡")
 
     return
 
