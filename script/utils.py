@@ -126,7 +126,7 @@ def perform_one_of_transitions(ticket_key: str, target_states: list[str]) -> Non
         try:
             perform_transition(ticket_key, target_state)
             return
-        except requests.exceptions.RequestException:
+        except (requests.exceptions.RequestException, UnexpectedException):
             is_last = target_state == target_states[-1]
             if is_last:
                 logging.error(f"[{ticket_key}] Failed to transition to all target states: {target_states}")
