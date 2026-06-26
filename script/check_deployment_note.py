@@ -270,7 +270,7 @@ def add_comment(ticket: Issue, remaining_quota: int) -> None:
                     },
                     {
                         "type": "text",
-                        "text": "DeploymentNote",
+                        "text": f"{warning_label}",
                         "marks": [
                             {
                                 "type": "code"
