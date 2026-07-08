@@ -45,12 +45,13 @@ def should_skip_by_tailing_next_part(ticket: Issue) -> bool:
     issue_links = extract_issue_links(ticket)
     for link in issue_links:
         if link.type.inward == "is cloned by":
-            inward_issue = getattr(link, "inward_issue", None)
+            inward_issue = getattr(link, "inward_issue")
             if not inward_issue:
                 continue
 
-            cloned_ticket_summary = inward_issue.fields.get("summary", "")
-            return is_custom_clone_summary(cloned_ticket_summary)
+            cloned_ticket_summary = inward_issue.fields.get("summary")
+            if is_custom_clone_summary(cloned_ticket_summary):
+                return True
 
     return False
 

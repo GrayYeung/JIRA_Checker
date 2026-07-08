@@ -36,6 +36,8 @@ def check_for_github() -> bool:
         ticket_key = ticket.key
         issue_id = ticket.id
 
+        logging.info(f"[{ticket_key}] Processing ticket...")
+
         try:
             if not issue_id:
                 logging.error(f"[{ticket_key}] Missing issue_id")
