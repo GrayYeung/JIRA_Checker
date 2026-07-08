@@ -33,6 +33,8 @@ def check_for_linked_dependency():
         ticket_key = ticket.key
         warnings = []
 
+        logging.info(f"[{ticket_key}] Processing ticket...")
+
         try:
             if should_skip_by_label(ticket, whitelisted_label):
                 logging.info(f"[{ticket_key}] Skipping due to whitelisted label...")
