@@ -3,6 +3,7 @@ import re
 
 import requests
 
+from constants import *
 from environment import *
 from exception.exceptionmodel import UnexpectedException
 from jira import *
@@ -11,7 +12,7 @@ from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailin
     perform_one_of_transitions, find_heading_ticket, determine_relationship
 
 ##
-whitelisted_label = "SuppressScanning"
+whitelisted_label = WHITELISTED_LABEL
 warning_label = "DeploymentNote"
 
 

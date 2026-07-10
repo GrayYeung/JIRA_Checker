@@ -2,6 +2,7 @@ import logging
 
 import requests
 
+from constants import *
 from environment import *
 from jira import *
 from jira.jiramodel import *
@@ -9,8 +10,8 @@ from .utils import print_conclusion, should_skip_by_label, find_heading_ticket, 
     extract_issue_links
 
 ##
-sprint_field = "customfield_10122"  # This is the field ID for the Sprint field in JIRA
-whitelisted_label = "SuppressScanning"
+sprint_field = SPRINT_FIELD  # This is the field ID for the Sprint field in JIRA
+whitelisted_label = WHITELISTED_LABEL
 
 
 ####

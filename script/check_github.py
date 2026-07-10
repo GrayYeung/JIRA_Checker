@@ -3,6 +3,7 @@ import re
 
 import requests
 
+from constants import *
 from environment import *
 from exception.exceptionmodel import UnexpectedException
 from github import github_client
@@ -13,8 +14,8 @@ from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailin
     perform_transition, find_heading_ticket, determine_relationship
 
 ##
-reviewer_field = "customfield_11696"  # This is the field ID for the Reviewer field in JIRA
-whitelisted_label = "SuppressScanning"
+reviewer_field = REVIEWER_FIELD  # This is the field ID for the Reviewer field in JIRA
+whitelisted_label = WHITELISTED_LABEL
 
 
 ####

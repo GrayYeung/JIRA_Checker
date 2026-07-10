@@ -11,11 +11,12 @@ GITHUB_TOKEN = os.getenv('CUSTOM_GITHUB_TOKEN')
 
 ## Flow config
 FALLBACK: str = ''
-JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE: bool = (os.getenv('JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE', FALLBACK).lower()
+FALLBACKS: list[str] = [FALLBACK, FALLBACK, FALLBACK]
+JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE: bool = (os.getenv('JIRA_SHOULD_CHECK_DEPLOYMENT_NOTE', FALLBACKS[0]).lower()
                                            in ('true', '1', 'yes'))
-JIRA_SHOULD_CHECK_LINKED_DEPENDENCY: bool = (os.getenv('JIRA_SHOULD_CHECK_LINKED_DEPENDENCY', FALLBACK).lower()
+JIRA_SHOULD_CHECK_LINKED_DEPENDENCY: bool = (os.getenv('JIRA_SHOULD_CHECK_LINKED_DEPENDENCY', FALLBACKS[1]).lower()
                                              in ('true', '1', 'yes'))
-JIRA_SHOULD_CHECK_GITHUB: bool = (os.getenv('JIRA_SHOULD_CHECK_GITHUB', FALLBACK).lower() in ('true', '1', 'yes'))
+JIRA_SHOULD_CHECK_GITHUB: bool = (os.getenv('JIRA_SHOULD_CHECK_GITHUB', FALLBACKS[2]).lower() in ('true', '1', 'yes'))
 LOGGER_LEVEL = logging.getLevelNamesMapping()[os.getenv('LOGGER_LEVEL', 'INFO').upper()]
 
 #### Export ####
