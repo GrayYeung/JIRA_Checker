@@ -3,6 +3,7 @@ import re
 
 import requests
 
+from constants import *
 from environment import *
 from exception.exceptionmodel import UnexpectedException
 from github import github_client
@@ -13,8 +14,8 @@ from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailin
     perform_transition, find_heading_ticket, determine_relationship
 
 ##
-reviewer_field = "customfield_11696"  # This is the field ID for the Reviewer field in JIRA
-whitelisted_label = "SuppressScanning"
+reviewer_field = REVIEWER_FIELD  # This is the field ID for the Reviewer field in JIRA
+whitelisted_label = WHITELISTED_LABEL
 
 
 ####
@@ -123,7 +124,7 @@ def nest_check_open_prs(ticket: Issue, linked_ticket_key: Optional[str]) -> list
         )
         return []
 
-    result = extract_open_prs(github_instance)
+    result = extract_open_prs(github_instance, ticket_key)
     logging.info(f"[{determine_relationship(ticket_key, linked_ticket_key)}] Open PRs: {len(result)}")
     return result
 
@@ -141,7 +142,7 @@ def extract_github_instance(resp: DevSummaryPanelResponse) -> Optional[InstanceT
     return None
 
 
-def extract_open_prs(github: InstanceType) -> list[PullRequest]:
+def extract_open_prs(github: InstanceType, ticket_key: str) -> list[PullRequest]:
     """
     Extract all OPEN PRs from a GitHub instance. (DRAFT is allowed)
     """
@@ -151,7 +152,7 @@ def extract_open_prs(github: InstanceType) -> list[PullRequest]:
         opens = [pr for pr in github.danglingPullRequests if pr.status and pr.status == 'OPEN']
         for open_pr in opens:
             url = open_pr.url
-            if not check_with_gh(url):
+            if not check_with_gh(url, ticket_key):
                 result.append(open_pr)
 
     if github.repository:
@@ -160,13 +161,13 @@ def extract_open_prs(github: InstanceType) -> list[PullRequest]:
                 opens = [pr for pr in repo.pullRequests if pr.status and pr.status == 'OPEN']
                 for open_pr in opens:
                     url = open_pr.url
-                    if not check_with_gh(url):
+                    if not check_with_gh(url, ticket_key):
                         result.append(open_pr)
 
     return result
 
 
-def check_with_gh(url: str | None) -> bool:
+def check_with_gh(url: str | None, ticket_key: str) -> bool:
     """
     :return TRUE if the status at gh is closed.
     """
@@ -182,7 +183,14 @@ def check_with_gh(url: str | None) -> bool:
     pr = github_client.fetch_pr(owner, repo, pr_number)
 
     ## Consider closed if state is 'closed' or merged_at is not None
-    return pr.state == 'closed' or pr.merged_at is not None
+    if pr.state == 'closed' or pr.merged_at is not None:
+        return True
+
+    if not ticket_key in pr.title and not ticket_key in pr.head.ref:
+        logging.info(f"[{ticket_key}] Skipping GH PR check as title and head branch not related")
+        return True
+
+    return False
 
 
 def add_comment(ticket: Issue, open_prs: list[PullRequest]):

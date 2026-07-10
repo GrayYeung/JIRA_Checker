@@ -3,8 +3,14 @@ from typing import Optional, List
 
 # Model for GitHub User
 class GitHubUser:
-    def __init__(self, login: Optional[str], id: Optional[int], avatar_url: Optional[str], html_url: Optional[str],
-                 type: Optional[str], site_admin: bool):
+    def __init__(self,
+                 login: Optional[str],
+                 id: Optional[int],
+                 avatar_url: Optional[str],
+                 html_url: Optional[str],
+                 type: Optional[str],
+                 site_admin: bool
+                 ):
         self.login = login
         self.id = id
         self.avatar_url = avatar_url
@@ -24,10 +30,31 @@ class GitHubUser:
         )
 
 
+# Model for GitHub PR head
+class GitHubPullRequestHead:
+    def __init__(self, ref: Optional[str]):
+        self.ref = ref
+
+    @staticmethod
+    def from_dict(data: dict):
+        return GitHubPullRequestHead(
+            ref=data.get('ref')
+        )
+
+
 # Model for GitHub Pull Request
 class GitHubPullRequest:
-    def __init__(self, id: Optional[int], number: Optional[int], title: Optional[str], body: Optional[str],
-                 user: GitHubUser, state: Optional[str], merged_at: Optional[str], assignees: List[GitHubUser]):
+    def __init__(self,
+                 id: Optional[int],
+                 number: Optional[int],
+                 title: Optional[str],
+                 body: Optional[str],
+                 user: GitHubUser,
+                 state: Optional[str],
+                 merged_at: Optional[str],
+                 assignees: List[GitHubUser],
+                 head: GitHubPullRequestHead
+                 ):
         self.id = id
         self.number = number
         self.title = title
@@ -36,11 +63,13 @@ class GitHubPullRequest:
         self.state = state
         self.merged_at = merged_at
         self.assignees = assignees  # List of GitHubUser
+        self.head = head
 
     @staticmethod
     def from_dict(data: dict):
         user = GitHubUser.from_dict(data.get('user', {}))
         assignees = [GitHubUser.from_dict(u) for u in data.get('assignees', [])]
+        head = GitHubPullRequestHead.from_dict(data.get('head', {}))
         return GitHubPullRequest(
             id=data.get('id'),
             number=data.get('number'),
@@ -49,5 +78,6 @@ class GitHubPullRequest:
             user=user,
             state=data.get('state'),
             merged_at=data.get('merged_at'),
-            assignees=assignees
+            assignees=assignees,
+            head=head
         )
