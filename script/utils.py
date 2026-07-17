@@ -163,7 +163,10 @@ def perform_transition(ticket_key: str, target_state: str) -> None:
                 ]
             }
         }
-        additional_fields_dict.update(set_fields)
+
+        ### Explicitly patch since transition not support that field update in one go
+        jira_client.update_ticket_fields(ticket_key, set_fields)
+        logging.info(f"[{ticket_key}] Patched ticket with Reopen/Rework reason field")
 
     if target_state == "Reopen (CAT)":
         set_fields = {
