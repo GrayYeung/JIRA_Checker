@@ -402,7 +402,7 @@ def add_comment(ticket: Issue, remaining_quota: int) -> None:
                                     },
                                     {
                                         "type": "text",
-                                        "text": " mentioned this ticket key"
+                                        "text": " mentioned this ticket key "
                                     },
                                     {
                                         "type": "text",
