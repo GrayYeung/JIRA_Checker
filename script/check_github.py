@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 
@@ -7,8 +8,8 @@ from constants import *
 from environment import *
 from exception.exceptionmodel import UnexpectedException
 from github import github_client
+from github.githubmodel import GitHubSearchPullRequest, GitHubSearchIssuesResponse
 from jira import *
-from jira.dev_summary_panel_model import *
 from jira.jiramodel import *
 from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailing_next_part, extract_assignee_id, \
     perform_transition, find_heading_ticket, determine_relationship
@@ -16,13 +17,14 @@ from .utils import print_conclusion, should_skip_by_label, should_skip_by_tailin
 ##
 reviewer_field = REVIEWER_FIELD  # This is the field ID for the Reviewer field in JIRA
 whitelisted_label = WHITELISTED_LABEL
+gh_field = GH_FIELD  # This is the field ID for the GitHub field in JIRA
 
 
 ####
 
 def check_for_github() -> bool:
     """
-    Ride on Git plugin in JIRA to check if there is any open PR for the issue.
+    Search GitHub directly for open or draft pull requests related to each JIRA issue.
     """
     logging.info("Checking for open git pull request... ⚠️")
 
@@ -35,16 +37,10 @@ def check_for_github() -> bool:
 
     for ticket in tickets:
         ticket_key = ticket.key
-        issue_id = ticket.id
 
         logging.info(f"[{ticket_key}] Processing ticket...")
 
         try:
-            if not issue_id:
-                logging.error(f"[{ticket_key}] Missing issue_id")
-                error_tickets.append(ticket_key)
-                continue
-
             if should_skip_by_label(ticket, whitelisted_label):
                 logging.info(f"[{ticket_key}] Skipping due to whitelisted label...")
                 continue
@@ -66,7 +62,7 @@ def check_for_github() -> bool:
             bad_tickets.append(ticket_key)
 
         except (requests.exceptions.RequestException, UnexpectedException) as e:
-            logging.error(f"[{ticket_key}] Encountered {type(e).__name__}: {e.message}")
+            logging.error(f"[{ticket_key}] Encountered {type(e).__name__}: {e}")
             error_tickets.append(ticket_key)
             continue
 
@@ -86,7 +82,7 @@ def fetch_tickets() -> list[Issue]:
     project = JIRA_PROJECT_KEY
 
     jql = f'updated >= -{time_range} and updated < -{time_buffer} and status IN ({", ".join(status_list)}) and project = {project}'
-    fields = ["assignee", "status", "labels", "issuelinks", "summary", reviewer_field]
+    fields = ["assignee", "status", "labels", "issuelinks", "summary", reviewer_field, gh_field]
 
     params = SearchTicketsParams(
         jql=jql,
@@ -99,9 +95,8 @@ def fetch_tickets() -> list[Issue]:
     return response.issues
 
 
-def nest_check_open_prs(ticket: Issue, linked_ticket_key: Optional[str]) -> list[PullRequest]:
+def nest_check_open_prs(ticket: Issue, linked_ticket_key: Optional[str]) -> list[GitHubSearchPullRequest]:
     ticket_key = ticket.key
-    issue_id = ticket.id
 
     ## check heading ticket
     heading_key = find_heading_ticket(ticket)
@@ -115,55 +110,74 @@ def nest_check_open_prs(ticket: Issue, linked_ticket_key: Optional[str]) -> list
             return heading_result
 
     ## check this ticket
-    resp = jira_client.get_dev_summary_panel_one_click_urls(issue_id)
-
-    github_instance = extract_github_instance(resp)
-    if not github_instance:
-        logging.info(
-            f"[{determine_relationship(ticket_key, linked_ticket_key)}] Skipping due to no GitHub trace found..."
-        )
+    if not has_open_pr_in_jira(ticket):
+        logging.info(f"[{ticket_key}] Skipping GitHub API calls: JIRA reports no OPEN pull request")
         return []
 
-    result = extract_open_prs(github_instance, ticket_key)
+    result = search_open_prs_from_github(ticket_key)
     logging.info(f"[{determine_relationship(ticket_key, linked_ticket_key)}] Open PRs: {len(result)}")
     return result
 
 
-def extract_github_instance(resp: DevSummaryPanelResponse) -> Optional[InstanceType]:
-    if resp \
-            and resp.data \
-            and resp.data.developmentInformation \
-            and resp.data.developmentInformation.details \
-            and resp.data.developmentInformation.details.instanceTypes:
-        instance_types = resp.data.developmentInformation.details.instanceTypes
-        github_instance = next((it for it in instance_types if it.type == 'GitHub'), None)
-        return github_instance
+def has_open_pr_in_jira(ticket: Issue) -> bool:
+    """Return whether JIRA's GitHub development field reports at least one open pull request."""
+    raw_value = getattr(ticket.fields, gh_field, None) if ticket.fields else None
+    field_data = parse_jira_github_field(raw_value)
+    if not field_data:
+        return False
 
-    return None
+    cached_value = field_data.get('cachedValue')
+    if not isinstance(cached_value, dict):
+        return False
+    summary = cached_value.get('summary')
+    if not isinstance(summary, dict):
+        return False
+    pull_request = summary.get('pullrequest')
+    if not isinstance(pull_request, dict):
+        return False
+    overall = pull_request.get('overall')
+    if not isinstance(overall, dict):
+        return False
+
+    return overall.get('open') is True
 
 
-def extract_open_prs(github: InstanceType, ticket_key: str) -> list[PullRequest]:
-    """
-    Extract all OPEN PRs from a GitHub instance. (DRAFT is allowed)
-    """
-    result: list[PullRequest] = []
+def parse_jira_github_field(raw_value: object) -> dict | None:
+    """Parse customfield_10000, whose JIRA representation embeds JSON after ``json=``."""
+    if isinstance(raw_value, dict):
+        return raw_value
+    if not isinstance(raw_value, str):
+        return None
 
-    if github.danglingPullRequests:
-        opens = [pr for pr in github.danglingPullRequests if pr.status and pr.status == 'OPEN']
-        for open_pr in opens:
-            url = open_pr.url
-            if not check_with_gh(url, ticket_key):
-                result.append(open_pr)
+    try:
+        parsed = json.loads(raw_value)
+        return parsed if isinstance(parsed, dict) else None
+    except json.JSONDecodeError:
+        json_start = raw_value.find('json=')
+        if json_start == -1:
+            return None
 
-    if github.repository:
-        for repo in github.repository:
-            if repo.pullRequests:
-                opens = [pr for pr in repo.pullRequests if pr.status and pr.status == 'OPEN']
-                for open_pr in opens:
-                    url = open_pr.url
-                    if not check_with_gh(url, ticket_key):
-                        result.append(open_pr)
+        try:
+            parsed, _ = json.JSONDecoder().raw_decode(raw_value[json_start + len('json='):])
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            return None
 
+
+def search_open_prs_from_github(ticket_key: str) -> list[GitHubSearchPullRequest]:
+    """Find and validate open or draft pull requests directly from GitHub Search."""
+    organization = (GITHUB_ORGANIZATION or '').strip()
+    if not organization:
+        logging.warning(f"[{ticket_key}] Skipping direct GitHub search: GITHUB_ORGANIZATION is not configured")
+        return []
+
+    search_response: GitHubSearchIssuesResponse = github_client.search_open_prs(organization, ticket_key)
+    result: list[GitHubSearchPullRequest] = []
+    for search_pr in search_response.items:
+        if search_pr.state == 'open' and search_pr.html_url and not check_with_gh(search_pr.html_url, ticket_key):
+            result.append(search_pr)
+
+    logging.info(f"[{ticket_key}] Direct GitHub Search open PRs: {len(result)}")
     return result
 
 
@@ -179,21 +193,24 @@ def check_with_gh(url: str | None, ticket_key: str) -> bool:
     if not m:
         return False
 
-    owner, repo, pr_number = m.group(1), m.group(2), m.group(3)
+    owner, repo, pr_number = m.group(1), m.group(2), int(m.group(3))
     pr = github_client.fetch_pr(owner, repo, pr_number)
 
     ## Consider closed if state is 'closed' or merged_at is not None
     if pr.state == 'closed' or pr.merged_at is not None:
         return True
 
-    if not ticket_key in pr.title and not ticket_key in pr.head.ref:
+    normalized_ticket_key = ticket_key.casefold()
+    title = (pr.title or '').casefold()
+    head_ref = (pr.head.ref or '').casefold()
+    if normalized_ticket_key not in title and normalized_ticket_key not in head_ref:
         logging.info(f"[{ticket_key}] Skipping GH PR check as title and head branch not related")
         return True
 
     return False
 
 
-def add_comment(ticket: Issue, open_prs: list[PullRequest]):
+def add_comment(ticket: Issue, open_prs: list[GitHubSearchPullRequest]):
     ticket_key = ticket.key
     user = jira_client.fetch_myself().display_name or "JIRA"
     assignee_id = extract_assignee_id(ticket)
@@ -249,7 +266,7 @@ def add_comment(ticket: Issue, open_prs: list[PullRequest]):
                 "content": [
                     {
                         "type": "text",
-                        "text": "From 'Development' session by GitHub plugin, found some PRs are still "
+                        "text": "GitHub Search found some pull requests that are still "
                     },
                     {
                         "type": "text",
@@ -278,7 +295,7 @@ def add_comment(ticket: Issue, open_prs: list[PullRequest]):
                                     {
                                         "type": "inlineCard",
                                         "attrs": {
-                                            "url": pr.url
+                                            "url": pr.html_url
                                         }
                                     },
                                     {
