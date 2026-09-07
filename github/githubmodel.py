@@ -1,6 +1,55 @@
 from typing import Optional, List
 
 
+# Model for a pull request returned by the GitHub Search Issues API
+class GitHubSearchPullRequest:
+    def __init__(self,
+                 id: Optional[int],
+                 number: Optional[int],
+                 title: Optional[str],
+                 html_url: Optional[str],
+                 state: Optional[str],
+                 draft: bool
+                 ):
+        self.id = id
+        self.number = number
+        self.title = title
+        self.html_url = html_url
+        self.state = state
+        self.draft = draft
+
+    @staticmethod
+    def from_dict(data: dict):
+        return GitHubSearchPullRequest(
+            id=data.get('id'),
+            number=data.get('number'),
+            title=data.get('title'),
+            html_url=data.get('html_url'),
+            state=data.get('state'),
+            draft=data.get('draft', False)
+        )
+
+
+# Model for the GitHub Search Issues API response
+class GitHubSearchIssuesResponse:
+    def __init__(self,
+                 total_count: int,
+                 incomplete_results: bool,
+                 items: List[GitHubSearchPullRequest]
+                 ):
+        self.total_count = total_count
+        self.incomplete_results = incomplete_results
+        self.items = items
+
+    @staticmethod
+    def from_dict(data: dict):
+        return GitHubSearchIssuesResponse(
+            total_count=data.get('total_count', 0),
+            incomplete_results=data.get('incomplete_results', False),
+            items=[GitHubSearchPullRequest.from_dict(item) for item in data.get('items', [])]
+        )
+
+
 # Model for GitHub User
 class GitHubUser:
     def __init__(self,

@@ -8,6 +8,7 @@ JIRA_PROJECT_KEY = os.getenv('JIRA_PROJECT_KEY')
 
 ## GH config
 GITHUB_TOKEN = os.getenv('CUSTOM_GITHUB_TOKEN')
+GITHUB_ORGANIZATION = os.getenv('CUSTOM_GITHUB_ORGANIZATION')
 
 ## Flow config
 FALLBACK: str = ''
@@ -30,5 +31,6 @@ __all__ = [
     'JIRA_SHOULD_CHECK_GITHUB',
     'LOGGER_LEVEL',
 
-    'GITHUB_TOKEN'
+    'GITHUB_TOKEN',
+    'GITHUB_ORGANIZATION'
 ]

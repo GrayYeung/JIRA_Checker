@@ -1,6 +1,6 @@
 import requests
 
-from .githubmodel import GitHubPullRequest
+from .githubmodel import GitHubPullRequest, GitHubSearchIssuesResponse
 
 
 #### Client ####
@@ -23,3 +23,16 @@ class GitHubClient:
         response.raise_for_status()
         data = response.json()
         return GitHubPullRequest.from_dict(data)
+
+    def search_open_prs(self, organization: str, ticket_key: str) -> GitHubSearchIssuesResponse:
+        """Find open (including draft) pull requests in an organization mentioning a JIRA ticket key."""
+        url = 'https://api.github.com/search/issues'
+        params = {
+            'q': f'{ticket_key} is:pr is:open org:{organization}',
+            'per_page': 100
+        }
+
+        response = requests.get(url, headers=self.__create_header(), params=params)
+        response.raise_for_status()
+        return GitHubSearchIssuesResponse.from_dict(response.json())
+
